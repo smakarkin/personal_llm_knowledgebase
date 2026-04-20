@@ -1,0 +1,133 @@
+@echo off
+chcp 65001 >nul
+set PYTHONIOENCODING=utf-8
+setlocal
+
+set FOLDER_NAME=Zettelkasten
+
+for /f "tokens=1-4 delims=/.- " %%a in ("%date%") do set d=%%d-%%b-%%c
+for /f "tokens=1-3 delims=:." %%a in ("%time%") do set t=%%a-%%b-%%c
+set LOG_FILE=zettelkasten_rebuild_%d%_%t%.log
+
+echo ========================================== > "%LOG_FILE%"
+echo Полное обновление knowledge layer >> "%LOG_FILE%"
+echo Каталог: %FOLDER_NAME% >> "%LOG_FILE%"
+echo ========================================== >> "%LOG_FILE%"
+
+echo ==========================================
+echo Полное обновление knowledge layer
+echo Каталог: %FOLDER_NAME%
+echo Лог: %LOG_FILE%
+echo ==========================================
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 1. Дозаполнение схемы и классификации>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 1. Дозаполнение схемы и классификации
+echo =========================
+python scripts\propose_clusters.py "%FOLDER_NAME%" >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 2. Пересборка primary-collections>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 2. Пересборка primary-collections
+echo =========================
+python scripts\build_collection.py "%FOLDER_NAME%" primary >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 3. Пересборка primary-concepts>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 3. Пересборка primary-concepts
+echo =========================
+python scripts\generate_concepts.py primary >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 4. Пересборка primary-index>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 4. Пересборка primary-index
+echo =========================
+python scripts\generate_index.py primary >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 5. Пересборка candidate-collections>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 5. Пересборка candidate-collections
+echo =========================
+python scripts\build_collection.py "%FOLDER_NAME%" candidate >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 6. Пересборка candidate-concepts>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 6. Пересборка candidate-concepts
+echo =========================
+python scripts\generate_concepts.py candidate >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo 7. Пересборка candidate-index>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 7. Пересборка candidate-index
+echo =========================
+python scripts\generate_index.py candidate >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo Готово>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo Готово
+echo =========================
+echo Лог: %LOG_FILE%
+goto :end
+
+:error
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+echo Пайплайн остановлен из-за ошибки>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo Пайплайн остановлен из-за ошибки
+echo =========================
+echo Лог: %LOG_FILE%
+exit /b 1
+
+:end
+endlocal
