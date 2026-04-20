@@ -1,18 +1,22 @@
 @echo off
+chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 setlocal
 
+set "SCRIPT_DIR=%~dp0"
+set "PY_SCRIPTS_DIR=%SCRIPT_DIR%.."
+
 if "%~1"=="" (
-    echo Использование:
-    echo   run_folder_pipeline.bat "Имя каталога" [primary^|candidate^|both] [reset^|noreset]
+    echo РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ:
+    echo   run_folder_pipeline.bat "РРјСЏ РїР°РїРєРё" [primary^|candidate^|both] [reset^|noreset]
     echo.
-    echo Примеры:
-    echo   run_folder_pipeline.bat "Неразобранные"
-    echo   run_folder_pipeline.bat "Неразобранные" primary
-    echo   run_folder_pipeline.bat "Неразобранные" candidate
-    echo   run_folder_pipeline.bat "Неразобранные" both
-    echo   run_folder_pipeline.bat "Неразобранные" both reset
-    echo   run_folder_pipeline.bat "Неразобранные" primary noreset
+    echo РџСЂРёРјРµСЂС‹:
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹"
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹" primary
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹" candidate
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹" both
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹" both reset
+    echo   run_folder_pipeline.bat "РџСЂРѕРµРєС‚С‹" primary noreset
     exit /b 1
 )
 
@@ -31,74 +35,74 @@ if "%~3"=="" (
 )
 
 if /I not "%COLLECTION_MODE%"=="primary" if /I not "%COLLECTION_MODE%"=="candidate" if /I not "%COLLECTION_MODE%"=="both" (
-    echo Ошибка: второй аргумент должен быть primary, candidate или both
+    echo РћС€РёР±РєР°: РІС‚РѕСЂРѕР№ РїР°СЂР°РјРµС‚СЂ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ primary, candidate РёР»Рё both
     exit /b 1
 )
 
 if /I not "%RESET_MODE%"=="reset" if /I not "%RESET_MODE%"=="noreset" (
-    echo Ошибка: третий аргумент должен быть reset или noreset
+    echo РћС€РёР±РєР°: С‚СЂРµС‚РёР№ РїР°СЂР°РјРµС‚СЂ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ reset РёР»Рё noreset
     exit /b 1
 )
 
 echo ==========================================
-echo Каталог: %FOLDER_NAME%
-echo Режим коллекций: %COLLECTION_MODE%
-echo Режим сброса: %RESET_MODE%
+echo РљР°С‚Р°Р»РѕРі: %FOLDER_NAME%
+echo Р РµР¶РёРј РєРѕР»Р»РµРєС†РёР№: %COLLECTION_MODE%
+echo Р РµР¶РёРј СЃР±СЂРѕСЃР°: %RESET_MODE%
 echo ==========================================
 
 if /I "%RESET_MODE%"=="reset" (
     echo.
     echo =========================
-    echo Сброс llm-полей
+    echo РЎР±СЂРѕСЃ llm-РїРѕР»РµР№
     echo =========================
-    python scripts\reset_llm_fields.py "%FOLDER_NAME%"
+    python "%PY_SCRIPTS_DIR%\reset_llm_fields.py" "%FOLDER_NAME%"
     if errorlevel 1 exit /b 1
 )
 
 echo.
 echo =========================
-echo Построение схемы и классификация
+echo Р”РѕР·Р°РїРѕР»РЅРµРЅРёРµ СЃС…РµРјС‹ Рё РєР»Р°СЃСЃРёС„РёРєР°С†РёРё
 echo =========================
-python scripts\propose_clusters.py "%FOLDER_NAME%"
+python "%PY_SCRIPTS_DIR%\propose_clusters.py" "%FOLDER_NAME%"
 if errorlevel 1 exit /b 1
 
 if /I "%COLLECTION_MODE%"=="primary" (
     echo.
     echo =========================
-    echo Сборка primary-коллекций
+    echo РЎР±РѕСЂРєР° primary-РєРѕР»Р»РµРєС†РёР№
     echo =========================
-    python scripts\build_collection.py "%FOLDER_NAME%" primary
+    python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" primary
     if errorlevel 1 exit /b 1
 )
 
 if /I "%COLLECTION_MODE%"=="candidate" (
     echo.
     echo =========================
-    echo Сборка candidate-коллекций
+    echo РЎР±РѕСЂРєР° candidate-РєРѕР»Р»РµРєС†РёР№
     echo =========================
-    python scripts\build_collection.py "%FOLDER_NAME%" candidate
+    python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" candidate
     if errorlevel 1 exit /b 1
 )
 
 if /I "%COLLECTION_MODE%"=="both" (
     echo.
     echo =========================
-    echo Сборка primary-коллекций
+    echo РЎР±РѕСЂРєР° primary-РєРѕР»Р»РµРєС†РёР№
     echo =========================
-    python scripts\build_collection.py "%FOLDER_NAME%" primary
+    python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" primary
     if errorlevel 1 exit /b 1
 
     echo.
     echo =========================
-    echo Сборка candidate-коллекций
+    echo РЎР±РѕСЂРєР° candidate-РєРѕР»Р»РµРєС†РёР№
     echo =========================
-    python scripts\build_collection.py "%FOLDER_NAME%" candidate
+    python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" candidate
     if errorlevel 1 exit /b 1
 )
 
 echo.
 echo =========================
-echo Готово
+echo Р“РѕС‚РѕРІРѕ
 echo =========================
 
 endlocal

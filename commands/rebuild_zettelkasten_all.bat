@@ -3,7 +3,9 @@ chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 setlocal
 
-set FOLDER_NAME=Zettelkasten
+set "SCRIPT_DIR=%~dp0"
+set "PY_SCRIPTS_DIR=%SCRIPT_DIR%.."
+set "FOLDER_NAME=Zettelkasten"
 
 for /f "tokens=1-4 delims=/.- " %%a in ("%date%") do set d=%%d-%%b-%%c
 for /f "tokens=1-3 delims=:." %%a in ("%time%") do set t=%%a-%%b-%%c
@@ -29,7 +31,7 @@ echo.
 echo =========================
 echo 1. Дозаполнение схемы и классификации
 echo =========================
-python scripts\propose_clusters.py "%FOLDER_NAME%" >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\propose_clusters.py" "%FOLDER_NAME%" >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -41,7 +43,7 @@ echo.
 echo =========================
 echo 2. Пересборка primary-collections
 echo =========================
-python scripts\build_collection.py "%FOLDER_NAME%" primary >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" primary >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -53,7 +55,7 @@ echo.
 echo =========================
 echo 3. Пересборка primary-concepts
 echo =========================
-python scripts\generate_concepts.py primary >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\generate_concepts.py" primary >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -65,7 +67,7 @@ echo.
 echo =========================
 echo 4. Пересборка primary-index
 echo =========================
-python scripts\generate_index.py primary >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\generate_index.py" primary >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -77,7 +79,7 @@ echo.
 echo =========================
 echo 5. Пересборка candidate-collections
 echo =========================
-python scripts\build_collection.py "%FOLDER_NAME%" candidate >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\build_collection.py" "%FOLDER_NAME%" candidate >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -89,7 +91,7 @@ echo.
 echo =========================
 echo 6. Пересборка candidate-concepts
 echo =========================
-python scripts\generate_concepts.py candidate >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\generate_concepts.py" candidate >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
@@ -101,7 +103,7 @@ echo.
 echo =========================
 echo 7. Пересборка candidate-index
 echo =========================
-python scripts\generate_index.py candidate >> "%LOG_FILE%" 2>&1
+python "%PY_SCRIPTS_DIR%\generate_index.py" candidate >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :error
 
 echo.>> "%LOG_FILE%"
