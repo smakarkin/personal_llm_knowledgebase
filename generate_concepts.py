@@ -188,11 +188,23 @@ Output structure:
 
     source_collections = [f"[[{item['path'].stem}]]" for item in collections]
     source_scopes = sorted({item.get("based_on_scope") for item in collections if item.get("based_on_scope")})
+    source_notes = []
+    seen_notes = set()
+    for item in collections:
+        raw_notes = item.get("source_notes", [])
+        if not isinstance(raw_notes, list):
+            continue
+        for note_link in raw_notes:
+            if not note_link or note_link in seen_notes:
+                continue
+            seen_notes.add(note_link)
+            source_notes.append(note_link)
 
     meta = {
         "type": "llm_concept",
         "concept_mode": mode,
         "cluster": cluster_name,
+        "source_notes": source_notes,
         "source_collections": source_collections,
         "source_scopes": source_scopes,
         "status": "draft",

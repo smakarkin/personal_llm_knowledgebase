@@ -232,12 +232,15 @@ Output structure:
 
     source_notes = [f"[[{n['title']}]]" for n in notes]
 
+    source_scopes = [scope_name] if scope_name else []
+
     meta = {
         "type": "llm_collection",
         "collection_mode": mode,
         "based_on_scope": scope_name,
         "cluster": cluster_name,
         "source_notes": source_notes,
+        "source_scopes": source_scopes,
         "topics": [],
         "status": "draft",
     }

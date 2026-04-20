@@ -216,10 +216,23 @@ Output structure:
     collection_links = [item["link"] for item in collections]
     concept_links = [item["link"] for item in concepts]
     source_scopes = sorted({item.get("based_on_scope") for item in collections if item.get("based_on_scope")})
+    source_notes = []
+    seen_notes = set()
+    for item in collections:
+        raw_notes = item.get("source_notes", [])
+        if not isinstance(raw_notes, list):
+            continue
+        for note_link in raw_notes:
+            if not note_link or note_link in seen_notes:
+                continue
+            seen_notes.add(note_link)
+            source_notes.append(note_link)
 
     meta = {
         "type": "llm_index",
         "index_mode": mode,
+        "cluster": None,
+        "source_notes": source_notes,
         "source_collections": collection_links,
         "source_concepts": concept_links,
         "source_scopes": source_scopes,
