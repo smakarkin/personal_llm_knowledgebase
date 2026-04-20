@@ -134,6 +134,18 @@ python "%PY_SCRIPTS_DIR%\append_log.py" "%FOLDER_NAME%" "%PIPELINE_MODE%" "%CURR
 
 echo.>> "%LOG_FILE%"
 echo =========================>> "%LOG_FILE%"
+echo 8. Обновление Knowledge index>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
+
+echo.
+echo =========================
+echo 8. Обновление Knowledge index
+echo =========================
+python "%PY_SCRIPTS_DIR%\generate_knowledge_index.py" >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :error
+
+echo.>> "%LOG_FILE%"
+echo =========================>> "%LOG_FILE%"
 echo Готово>> "%LOG_FILE%"
 echo =========================>> "%LOG_FILE%"
 
