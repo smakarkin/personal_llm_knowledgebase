@@ -102,6 +102,13 @@ if /I "%COLLECTION_MODE%"=="both" (
 
 echo.
 echo =========================
+echo Обновление Knowledge index
+echo =========================
+python "%PY_SCRIPTS_DIR%\generate_knowledge_index.py"
+if errorlevel 1 exit /b 1
+
+echo.
+echo =========================
 echo Готово
 echo =========================
 
