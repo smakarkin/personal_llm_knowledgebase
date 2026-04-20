@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 import sys
+from typing import Callable
 import yaml
 
 VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
@@ -96,7 +97,11 @@ def extract_short_description(meta: dict, body: str) -> str:
     return "Без описания"
 
 
-def collect_md_files(folder: Path, include: callable | None = None, exclude_name: str | None = None) -> list[dict]:
+def collect_md_files(
+    folder: Path,
+    include: Callable[[Path, dict, str], bool] | None = None,
+    exclude_name: str | None = None,
+) -> list[dict]:
     if not folder.exists():
         return []
 
