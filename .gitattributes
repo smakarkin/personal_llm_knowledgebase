@@ -1,0 +1,13 @@
+# Keep text normalization predictable in cross-platform work
+* text=auto eol=lf
+
+# Windows scripts should stay CRLF for local double-click/run compatibility
+*.bat text eol=crlf
+
+# Generated LLM layers: still versioned, but marked as generated for GitHub UI
+10_llm_meta/** linguist-generated=true
+11_llm_collections_primary/** linguist-generated=true
+11_llm_collections_candidate/** linguist-generated=true
+12_llm_concepts/** linguist-generated=true
+13_llm_indexes/** linguist-generated=true
+14_llm_traces/** linguist-generated=true
