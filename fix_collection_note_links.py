@@ -3,7 +3,9 @@ import re
 import sys
 from collections import defaultdict
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+from config import VAULT_PATH
+
+VAULT = VAULT_PATH
 
 TARGET_DIRS = [
     VAULT / "11_llm_collections_primary",

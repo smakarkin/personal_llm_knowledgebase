@@ -4,7 +4,9 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+from config import VAULT_PATH
+
+VAULT = VAULT_PATH
 LOG_PATH = VAULT / "13_llm_indexes" / "log.md"
 
 

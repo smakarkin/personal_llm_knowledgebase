@@ -9,17 +9,18 @@ import re
 import sys
 from typing import Any
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import MODEL, VAULT_PATH, get_client
+
 try:
     import yaml
 except Exception:
     yaml = None
 
-try:
-    from config import client, MODEL
-except Exception:
-    client = None
-    MODEL = None
-
+client = None
 
 CONCEPTS_DIR = "12_llm_concepts"
 COLLECTIONS_DIRS = ["11_llm_collections_primary", "11_llm_collections_candidate"]
@@ -185,31 +186,18 @@ def load_docs(vault: Path) -> list[NoteDoc]:
     return docs
 
 
-def looks_like_vault(path: Path) -> bool:
-    if not path.exists():
-        return False
-    if (path / CONCEPTS_DIR).exists():
-        return True
-    return any((path / folder).exists() for folder in COLLECTIONS_DIRS)
-
-
 def resolve_vault_path(raw_vault: str) -> tuple[Path, list[Path]]:
-    candidate = Path(raw_vault).resolve()
-    checked: list[Path] = [candidate]
+    raw = raw_vault.strip()
+    if raw in {"", ".", "./"}:
+        vault = VAULT_PATH.resolve()
+        return vault, [vault]
 
-    if looks_like_vault(candidate):
-        return candidate, checked
-
-    # Частый случай: скрипт запускают из <VAULT>/scripts с --vault .
-    for parent in candidate.parents:
-        checked.append(parent)
-        if looks_like_vault(parent):
-            return parent, checked
-        # Чтобы не сканировать до корня диска без нужды.
-        if len(checked) >= 8:
-            break
-
-    return candidate, checked
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = (Path.cwd() / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+    return candidate, [candidate]
 
 
 def build_candidates(docs: list[NoteDoc], limit: int) -> list[tuple[NoteDoc, NoteDoc, float, str]]:
@@ -360,7 +348,7 @@ def build_report(
     docs_count: int,
     checked_paths: list[Path] | None = None,
 ) -> str:
-    now = dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         "# Contradiction check (MVP)",
         "",
@@ -389,7 +377,7 @@ def build_report(
         ])
         if checked_paths:
             lines.append("")
-            lines.append("Проверенные пути (auto-detect):")
+            lines.append("Проверенные пути:")
             for p in checked_paths:
                 lines.append(f"- `{p.as_posix()}`")
         return "\n".join(lines) + "\n"
@@ -443,7 +431,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="MVP-проверка противоречий в concepts/collections с Markdown-отчётом."
     )
-    parser.add_argument("--vault", default=".", help="Путь к корню vault (по умолчанию текущая папка).")
+    parser.add_argument(
+        "--vault",
+        default=str(VAULT_PATH),
+        help="Путь к корню vault (по умолчанию: VAULT_PATH из config.py).",
+    )
     parser.add_argument("--output", default=DEFAULT_OUTPUT, help="Путь выходного Markdown-отчёта.")
     parser.add_argument("--candidate-limit", type=int, default=60, help="Сколько пар анализировать после преселекции.")
     parser.add_argument("--top", type=int, default=20, help="Максимум конфликтов в отчёте.")
@@ -453,6 +445,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    global client
+    if args.use_llm:
+        try:
+            client = get_client()
+        except Exception as e:
+            safe_print(f"WARNING: LLM отключён: {e}")
+            args.use_llm = False
 
     vault, checked_paths = resolve_vault_path(args.vault)
     output_path = Path(args.output)

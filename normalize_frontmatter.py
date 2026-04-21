@@ -2,7 +2,9 @@ from pathlib import Path
 import sys
 import yaml
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+from config import VAULT_PATH
+
+VAULT = VAULT_PATH
 
 GENERATED_DIRS = [
     VAULT / "11_llm_collections_primary",

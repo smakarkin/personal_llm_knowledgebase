@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import VAULT_PATH
+
 try:
     import yaml  # type: ignore
 except Exception:
@@ -45,82 +51,6 @@ def safe_print(*args: object) -> None:
             print("[UNPRINTABLE OUTPUT]")
 
 
-def detect_default_vault() -> Path:
-    """
-    Пытаемся определить корень vault независимо от того,
-    лежит ли скрипт в scripts/ или в scripts/scripts/.
-    """
-    script_path = Path(__file__).resolve()
-    candidates = [script_path.parent, *script_path.parents]
-
-    # 0) Явный приоритет: если рядом есть каталог Zettelkasten, используем его как vault.
-    # Это покрывает структуру:
-    # C:\...\04_Zettelkasten\scripts\lint_knowledge_base.py
-    # C:\...\04_Zettelkasten\Zettelkasten\...
-    for candidate in candidates:
-        zk_dir = candidate / "Zettelkasten"
-        if zk_dir.is_dir():
-            return zk_dir
-
-    # 1) Приоритет: взять VAULT из semantic_trace.py (тот же target-каталог для артефактов).
-    semantic_trace_candidates = [
-        candidate / "semantic_trace.py"
-        for candidate in candidates
-    ]
-    for semantic_trace_path in semantic_trace_candidates:
-        parsed = parse_vault_from_semantic_trace(semantic_trace_path)
-        if parsed is not None:
-            return parsed
-
-    # 2) Эвристика по структуре репозитория.
-    for candidate in candidates:
-        has_commands = (candidate / "commands").is_dir()
-        has_agents = (candidate / "AGENTS.md").is_file()
-        if has_commands or has_agents:
-            return candidate
-
-    # Фолбэк: историческое поведение (корень = на 2 уровня выше файла)
-    return script_path.parent.parent
-
-
-def parse_vault_from_semantic_trace(path: Path) -> Path | None:
-    if not path.exists() or not path.is_file():
-        return None
-
-    text = path.read_text(encoding="utf-8", errors="ignore")
-    match = re.search(r"""(?m)^\s*VAULT\s*=\s*Path\(\s*r?["'](.+?)["']\s*\)\s*$""", text)
-    if not match:
-        return None
-
-    raw = match.group(1).strip()
-    if not raw:
-        return None
-    return Path(raw)
-
-
-def normalize_vault_path(vault: Path) -> Path:
-    """
-    Нормализует путь vault для частой структуры:
-    04_Zettelkasten/
-      scripts/
-      Zettelkasten/
-    """
-    candidate = vault
-
-    # Если передали корень верхнего уровня, но внутри есть подпапка Zettelkasten.
-    nested = candidate / "Zettelkasten"
-    if nested.is_dir():
-        return nested
-
-    # Если передали scripts, а рядом есть Zettelkasten.
-    if candidate.name.lower() == "scripts":
-        sibling = candidate.parent / "Zettelkasten"
-        if sibling.is_dir():
-            return sibling
-
-    return candidate
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="MVP-линтер knowledge base: диагностирует проблемы в generated layers и Zettelkasten."
@@ -128,8 +58,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--vault",
         type=Path,
-        default=detect_default_vault(),
-        help="Путь к корню базы (по умолчанию: корень репозитория).",
+        default=VAULT_PATH,
+        help="Путь к корню базы (по умолчанию: VAULT_PATH из config.py).",
     )
     parser.add_argument(
         "--min-source-notes",
@@ -452,7 +382,7 @@ def write_report(report_dir: Path, report_body: str) -> Path:
 
 def main() -> None:
     args = parse_args()
-    vault = normalize_vault_path(args.vault.resolve())
+    vault = args.vault.resolve()
     report_dir = args.report_dir.resolve() if args.report_dir else (vault / "14_llm_traces")
 
     safe_print("[1/6] Инициализация...")

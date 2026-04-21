@@ -3,7 +3,9 @@ import sys
 import re
 import yaml
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+from config import VAULT_PATH
+
+VAULT = VAULT_PATH
 
 REMOVE_FIELDS = [
     "llm_topic",
