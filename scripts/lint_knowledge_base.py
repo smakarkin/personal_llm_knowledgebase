@@ -53,6 +53,15 @@ def detect_default_vault() -> Path:
     script_path = Path(__file__).resolve()
     candidates = [script_path.parent, *script_path.parents]
 
+    # 0) Явный приоритет: если рядом есть каталог Zettelkasten, используем его как vault.
+    # Это покрывает структуру:
+    # C:\...\04_Zettelkasten\scripts\lint_knowledge_base.py
+    # C:\...\04_Zettelkasten\Zettelkasten\...
+    for candidate in candidates:
+        zk_dir = candidate / "Zettelkasten"
+        if zk_dir.is_dir():
+            return zk_dir
+
     # 1) Приоритет: взять VAULT из semantic_trace.py (тот же target-каталог для артефактов).
     semantic_trace_candidates = [
         candidate / "semantic_trace.py"
