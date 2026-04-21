@@ -185,6 +185,33 @@ def load_docs(vault: Path) -> list[NoteDoc]:
     return docs
 
 
+def looks_like_vault(path: Path) -> bool:
+    if not path.exists():
+        return False
+    if (path / CONCEPTS_DIR).exists():
+        return True
+    return any((path / folder).exists() for folder in COLLECTIONS_DIRS)
+
+
+def resolve_vault_path(raw_vault: str) -> tuple[Path, list[Path]]:
+    candidate = Path(raw_vault).resolve()
+    checked: list[Path] = [candidate]
+
+    if looks_like_vault(candidate):
+        return candidate, checked
+
+    # Частый случай: скрипт запускают из <VAULT>/scripts с --vault .
+    for parent in candidate.parents:
+        checked.append(parent)
+        if looks_like_vault(parent):
+            return parent, checked
+        # Чтобы не сканировать до корня диска без нужды.
+        if len(checked) >= 8:
+            break
+
+    return candidate, checked
+
+
 def build_candidates(docs: list[NoteDoc], limit: int) -> list[tuple[NoteDoc, NoteDoc, float, str]]:
     scored: list[tuple[NoteDoc, NoteDoc, float, str]] = []
 
@@ -330,6 +357,8 @@ def build_report(
     candidates: list[tuple[NoteDoc, NoteDoc, float, str]],
     use_llm: bool,
     top_n: int,
+    docs_count: int,
+    checked_paths: list[Path] | None = None,
 ) -> str:
     now = dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     lines = [
@@ -338,6 +367,7 @@ def build_report(
         f"- Дата: {now}",
         "- Слой: concepts + collections",
         f"- Кандидатов после преселекции: {len(candidates)}",
+        f"- Загружено документов: {docs_count}",
         f"- LLM-анализ: {'включён' if use_llm else 'выключен (только эвристики)'}",
         "",
         "## Метод",
@@ -347,6 +377,22 @@ def build_report(
         "## Подозреваемые конфликты",
         "",
     ]
+
+    if docs_count == 0:
+        lines.extend([
+            "Документы для анализа не найдены.",
+            "",
+            "Проверьте путь `--vault` и наличие папок:",
+            f"- `{CONCEPTS_DIR}`",
+            f"- `{COLLECTIONS_DIRS[0]}`",
+            f"- `{COLLECTIONS_DIRS[1]}`",
+        ])
+        if checked_paths:
+            lines.append("")
+            lines.append("Проверенные пути (auto-detect):")
+            for p in checked_paths:
+                lines.append(f"- `{p.as_posix()}`")
+        return "\n".join(lines) + "\n"
 
     if not candidates:
         lines.extend([
@@ -408,22 +454,27 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    vault = Path(args.vault).resolve()
+    vault, checked_paths = resolve_vault_path(args.vault)
     output_path = Path(args.output)
     if not output_path.is_absolute():
         output_path = (vault / output_path).resolve()
 
     docs = load_docs(vault)
-    if not docs:
-        raise SystemExit("Не найдено concepts/collections для анализа.")
-
-    candidates = build_candidates(docs, max(1, args.candidate_limit))
-    report = build_report(vault, candidates, use_llm=args.use_llm, top_n=max(1, args.top))
+    candidates = build_candidates(docs, max(1, args.candidate_limit)) if docs else []
+    report = build_report(
+        vault,
+        candidates,
+        use_llm=args.use_llm,
+        top_n=max(1, args.top),
+        docs_count=len(docs),
+        checked_paths=checked_paths,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(report, encoding="utf-8")
 
     safe_print(f"Готово: {output_path}")
+    safe_print(f"Vault: {vault}")
     safe_print(f"Документов: {len(docs)}; кандидатов: {len(candidates)}")
 
 
