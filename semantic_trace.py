@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import re
 import sys
+import time
 from typing import Any
 
 import yaml
@@ -22,6 +23,9 @@ OUTPUT_DIR = VAULT / "14_llm_traces"
 MAX_BODY_CHARS = 2500
 TOP_K_STAGE1 = 12
 TOP_K_STAGE2 = 20
+MAX_STAGE1_PAYLOAD_CHARS = 1800
+MAX_STAGE2_PAYLOAD_CHARS = 2000
+MAX_JSON_FIX_ATTEMPTS = 2
 
 
 def safe_print(*args):
@@ -31,6 +35,10 @@ def safe_print(*args):
         sys.stdout.flush()
     except Exception:
         print(text.encode("cp1251", errors="replace").decode("cp1251", errors="replace"))
+
+
+def progress(step: int, total: int, label: str):
+    safe_print(f"[{step}/{total}] {label}")
 
 
 def parse_note(path: Path) -> tuple[dict, str]:
@@ -55,6 +63,42 @@ def truncate(text: str, limit: int = MAX_BODY_CHARS) -> str:
     if len(text) > limit:
         return text[:limit] + "\n...[truncated]"
     return text
+
+
+def clean_llm_json_text(raw: str) -> str:
+    text = (raw or "").strip()
+    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    return text
+
+
+def extract_first_json_object(text: str) -> str:
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("JSON object not found")
+    depth = 0
+    for idx, ch in enumerate(text[start:], start=start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:idx + 1]
+    raise ValueError("Unclosed JSON object")
+
+
+def robust_json_loads(raw: str) -> dict[str, Any]:
+    cleaned = clean_llm_json_text(raw)
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    extracted = extract_first_json_object(cleaned)
+    data = json.loads(extracted)
+    if not isinstance(data, dict):
+        raise ValueError("JSON root must be object")
+    return data
 
 
 def obsidian_link(path: Path) -> str:
@@ -137,7 +181,7 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
             "cluster": item.get("cluster"),
             "mode": item.get("mode"),
             "scope": item.get("scope"),
-            "text": item["body"],
+            "text": truncate(item["body"], MAX_STAGE1_PAYLOAD_CHARS),
         })
 
     prompt = f"""
@@ -169,18 +213,27 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 """
 
-    resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": "Ты делаешь точный семантический отбор и возвращаешь только валидный JSON."},
-            {"role": "user", "content": prompt},
-        ],
-    )
-
-    text = resp.choices[0].message.content.strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    data = json.loads(text)
+    data: dict[str, Any] | None = None
+    last_error = None
+    for attempt in range(1, MAX_JSON_FIX_ATTEMPTS + 1):
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL,
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": "Ты делаешь точный семантический отбор и возвращаешь только валидный JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            text = resp.choices[0].message.content or ""
+            data = robust_json_loads(text)
+            break
+        except Exception as exc:
+            last_error = exc
+            safe_print(f"STAGE1 PARSE RETRY {attempt}/{MAX_JSON_FIX_ATTEMPTS}:", exc)
+            time.sleep(0.5)
+    if data is None:
+        raise RuntimeError(f"STAGE1 failed to parse JSON: {last_error}")
 
     by_id = {i + 1: item for i, item in enumerate(items)}
     ranked: list[dict[str, Any]] = []
@@ -253,7 +306,7 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
             "title": item["title"],
             "link": item["link"],
             "via": item["via"],
-            "text": item["body"],
+            "text": truncate(item["body"], MAX_STAGE2_PAYLOAD_CHARS),
         })
 
     prompt = f"""
@@ -286,18 +339,27 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 """
 
-    resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": "Ты восстанавливаешь смысловые основания идеи и возвращаешь только валидный JSON."},
-            {"role": "user", "content": prompt},
-        ],
-    )
-
-    text = resp.choices[0].message.content.strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    data = json.loads(text)
+    data: dict[str, Any] | None = None
+    last_error = None
+    for attempt in range(1, MAX_JSON_FIX_ATTEMPTS + 1):
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL,
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": "Ты восстанавливаешь смысловые основания идеи и возвращаешь только валидный JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            text = resp.choices[0].message.content or ""
+            data = robust_json_loads(text)
+            break
+        except Exception as exc:
+            last_error = exc
+            safe_print(f"STAGE2 PARSE RETRY {attempt}/{MAX_JSON_FIX_ATTEMPTS}:", exc)
+            time.sleep(0.5)
+    if data is None:
+        raise RuntimeError(f"STAGE2 failed to parse JSON: {last_error}")
 
     by_id = {i + 1: item for i, item in enumerate(note_items)}
     traced: list[dict[str, Any]] = []
@@ -339,21 +401,37 @@ def save_report(query: str, stage1_matches: list[dict[str, Any]], stage2_notes: 
         "## Исходный запрос",
         query,
         "",
-        "## Найденные collections/concepts",
+        "## Top matched concepts/collections",
     ]
 
-    if not stage1_matches:
-        lines.append("- _Ничего релевантного не найдено на верхнем слое._")
-    for item in stage1_matches:
+    top_concepts = [item for item in stage1_matches if item.get("kind") == "concept"]
+    top_collections = [item for item in stage1_matches if item.get("kind") == "collection"]
+
+    lines.append("### Concepts")
+    if not top_concepts:
+        lines.append("- _Нет релевантных concepts._")
+    for item in top_concepts:
         lines.extend([
-            f"- **{item['kind']}** {item['link']}",
+            f"- {item['link']}",
             f"  - relevance: {item.get('relevance')}",
             f"  - extracted_idea: {item.get('extracted_idea')}",
-            f"  - why: {item.get('why')}",
+            f"  - why_related: {item.get('why')}",
             "",
         ])
 
-    lines.append("## Найденные source notes")
+    lines.append("### Collections")
+    if not top_collections:
+        lines.append("- _Нет релевантных collections._")
+    for item in top_collections:
+        lines.extend([
+            f"- {item['link']}",
+            f"  - relevance: {item.get('relevance')}",
+            f"  - extracted_idea: {item.get('extracted_idea')}",
+            f"  - why_related: {item.get('why')}",
+            "",
+        ])
+
+    lines.append("## Source notes (trace)")
     if not stage2_notes:
         lines.append("- _Нет подтверждающих source notes._")
     for note in stage2_notes:
@@ -367,17 +445,19 @@ def save_report(query: str, stage1_matches: list[dict[str, Any]], stage2_notes: 
         ])
 
     lines.extend([
-        "## Объяснение релевантности",
+        "## Why related",
         "Критерий: совпадение смыслового ядра запроса с идеями из collections/concepts и подтверждение через source notes.",
         "",
     ])
 
-    if stage2_notes and synthesis.strip():
+    lines.append("## Краткая synthesis")
+    if synthesis.strip():
         lines.extend([
-            "## Краткая synthesis/hypothesis",
             synthesis,
             "",
         ])
+    else:
+        lines.append("_Синтез не сформирован (недостаточно опорных source notes)._")
 
     out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
@@ -388,26 +468,33 @@ def main():
         raise SystemExit('Использование: python semantic_trace.py "Описание идеи или понятия"')
 
     query = sys.argv[1].strip()
+    progress(1, 7, "Старт semantic_trace")
     safe_print("QUERY:", query)
 
+    progress(2, 7, "Загрузка верхних слоёв (concepts/collections)")
     items = load_knowledge_items()
     safe_print("LOADED TOP-LAYER ITEMS:", len(items))
 
+    progress(3, 7, "Этап 1: semantic screening по верхним слоям")
     stage1_matches = stage1_rank(query, items)
     safe_print("STAGE 1 MATCHES:", len(stage1_matches))
 
+    progress(4, 7, "Сбор source_notes только для выбранных items")
     note_items = collect_source_notes(stage1_matches)
     safe_print("COLLECTED SOURCE NOTES:", len(note_items))
 
     if note_items:
+        progress(5, 7, "Этап 2: semantic trace по source notes")
         stage2_notes, synthesis = stage2_trace_notes(query, note_items)
         safe_print("STAGE 2 NOTES:", len(stage2_notes))
     else:
         stage2_notes, synthesis = [], ""
         safe_print("STAGE 2 SKIPPED: no source notes")
 
+    progress(6, 7, "Сохранение markdown отчёта в 14_llm_traces")
     report_path = save_report(query, stage1_matches, stage2_notes, synthesis)
     safe_print("SAVED REPORT:", report_path)
+    progress(7, 7, "Готово")
 
 
 if __name__ == "__main__":
