@@ -4,9 +4,10 @@ import re
 import yaml
 from collections import defaultdict
 
-from config import client, MODEL
+from config import MODEL, VAULT_PATH, get_client
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+VAULT = VAULT_PATH
+client = get_client()
 
 OUTPUT_DIR_PRIMARY = VAULT / "11_llm_collections_primary"
 OUTPUT_DIR_CANDIDATE = VAULT / "11_llm_collections_candidate"

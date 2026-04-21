@@ -4,7 +4,9 @@ import sys
 from typing import Callable
 import yaml
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+from config import VAULT_PATH
+
+VAULT = VAULT_PATH
 
 COLLECTIONS_PRIMARY_DIR = VAULT / "11_llm_collections_primary"
 COLLECTIONS_CANDIDATE_DIR = VAULT / "11_llm_collections_candidate"

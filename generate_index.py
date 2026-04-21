@@ -3,9 +3,10 @@ import sys
 import re
 import yaml
 
-from config import client, MODEL
+from config import MODEL, VAULT_PATH, get_client
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+VAULT = VAULT_PATH
+client = get_client()
 
 COLLECTIONS_PRIMARY_DIR = VAULT / "11_llm_collections_primary"
 COLLECTIONS_CANDIDATE_DIR = VAULT / "11_llm_collections_candidate"
