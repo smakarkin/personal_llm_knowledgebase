@@ -4,9 +4,10 @@ import re
 import json
 import yaml
 
-from config import client, MODEL
+from config import MODEL, VAULT_PATH, get_client
 
-VAULT = Path(r"C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten")
+VAULT = VAULT_PATH
+client = get_client()
 
 
 def safe_print(*args):
