@@ -1,9 +1,9 @@
 # InBox ingest workflow (короткий формальный регламент)
 
 ## Назначение
-Этот workflow описывает **минимальный** и повторяемый процесс обработки входящих заметок из `InBox`:
+Этот workflow описывает **минимальный** и повторяемый процесс обработки входящих заметок из `__Inbox` (или `InBox`, если у вас так называется папка):
 
-`InBox -> classify/cluster -> collections -> (опционально) indexes -> ручная проверка -> перенос в Zettelkasten вручную`
+`__Inbox -> classify/cluster -> collections -> (опционально) indexes -> ручная проверка -> перенос в Zettelkasten вручную`
 
 Важно:
 - автоматического переноса в `Zettelkasten` нет;
@@ -12,7 +12,7 @@
 ---
 
 ## Предусловия
-- Входящие заметки находятся в папке `InBox` (или `__Inbox`, если у вас так настроено).
+- Входящие заметки находятся в папке `__Inbox` (или `InBox`, если у вас так настроено).
 - Скрипты доступны в корне репозитория:
   - `propose_clusters.py`
   - `classify_notes.py` (альтернатива при уже готовой схеме)
@@ -27,7 +27,7 @@
 Рекомендуемая команда:
 
 ```bat
-python propose_clusters.py InBox
+python propose_clusters.py __Inbox
 ```
 
 Что делает:
@@ -37,14 +37,14 @@ python propose_clusters.py InBox
 
 > Если схема уже стабильна и нужна только классификация, допускается:
 >
-> `python classify_notes.py InBox`
+> `python classify_notes.py __Inbox`
 
 ### Шаг 2. Сборка collections по InBox
 Выполнить оба режима:
 
 ```bat
-python build_collection.py InBox primary
-python build_collection.py InBox candidate
+python build_collection.py __Inbox primary
+python build_collection.py __Inbox candidate
 ```
 
 Результат:
@@ -62,7 +62,7 @@ python generate_index.py candidate
 ---
 
 ## Критерий готовности заметки к переносу в Zettelkasten
-Заметка из InBox считается готовой к **ручному** переносу, если одновременно выполнено:
+Заметка из `__Inbox`/`InBox` считается готовой к **ручному** переносу, если одновременно выполнено:
 
 1. У заметки заполнены обязательные поля классификации:
    - `llm_topic`
@@ -78,7 +78,7 @@ python generate_index.py candidate
 ---
 
 ## Короткий чеклист ручной проверки после ingest
-- [ ] В `InBox` не осталось важных заметок без `llm_processed: true`.
+- [ ] В `__Inbox` (или вашей входящей папке) не осталось важных заметок без `llm_processed: true`.
 - [ ] Для обработанных заметок заполнены ключевые `llm_*` поля (topic/type/clusters).
 - [ ] Сформировались/обновились collections для `primary` и `candidate`.
 - [ ] В collections корректные wikilinks на исходные заметки.
@@ -91,9 +91,9 @@ python generate_index.py candidate
 Для стандартного прогона ingest используйте:
 
 ```bat
-commands\run_inbox_ingest.bat InBox yes
+commands\run_inbox_ingest.bat __Inbox yes
 ```
 
 Где:
-- `InBox` — имя scope-папки;
+- `__Inbox` — имя scope-папки по умолчанию (можно передать `InBox` или другое имя вашей входящей папки);
 - `yes` — обновлять индексы (`no` — пропустить).

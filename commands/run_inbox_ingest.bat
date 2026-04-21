@@ -7,7 +7,7 @@ set "SCRIPT_DIR=%~dp0"
 set "PY_SCRIPTS_DIR=%SCRIPT_DIR%.."
 
 if "%~1"=="" (
-    set "FOLDER_NAME=InBox"
+    set "FOLDER_NAME=__Inbox"
 ) else (
     set "FOLDER_NAME=%~1"
 )
@@ -20,7 +20,7 @@ if "%~2"=="" (
 
 if /I not "%UPDATE_INDEXES%"=="yes" if /I not "%UPDATE_INDEXES%"=="no" (
     echo Ошибка: второй параметр должен быть yes или no
-    echo Пример: run_inbox_ingest.bat InBox yes
+    echo Пример: run_inbox_ingest.bat __Inbox yes
     exit /b 1
 )
 
