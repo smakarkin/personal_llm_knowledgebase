@@ -98,6 +98,29 @@ def parse_vault_from_semantic_trace(path: Path) -> Path | None:
     return Path(raw)
 
 
+def normalize_vault_path(vault: Path) -> Path:
+    """
+    Нормализует путь vault для частой структуры:
+    04_Zettelkasten/
+      scripts/
+      Zettelkasten/
+    """
+    candidate = vault
+
+    # Если передали корень верхнего уровня, но внутри есть подпапка Zettelkasten.
+    nested = candidate / "Zettelkasten"
+    if nested.is_dir():
+        return nested
+
+    # Если передали scripts, а рядом есть Zettelkasten.
+    if candidate.name.lower() == "scripts":
+        sibling = candidate.parent / "Zettelkasten"
+        if sibling.is_dir():
+            return sibling
+
+    return candidate
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="MVP-линтер knowledge base: диагностирует проблемы в generated layers и Zettelkasten."
@@ -429,7 +452,7 @@ def write_report(report_dir: Path, report_body: str) -> Path:
 
 def main() -> None:
     args = parse_args()
-    vault = args.vault.resolve()
+    vault = normalize_vault_path(args.vault.resolve())
     report_dir = args.report_dir.resolve() if args.report_dir else (vault / "14_llm_traces")
 
     safe_print("[1/6] Инициализация...")
