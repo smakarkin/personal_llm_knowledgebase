@@ -17,7 +17,8 @@
 ---
 
 ## 2) Актуальная структура слоёв
-- `InBox`, `Zettelkasten`, `Концентраторы` и другие содержательные папки — **raw notes**.
+- `raw/` — **immutable raw layer** для исходных источников (`raw/articles`, `raw/books`, `raw/assets`, `raw/imports`) без автоматической миграции старых заметок.
+- `InBox`, `Zettelkasten`, `Концентраторы` и другие содержательные папки — **рабочие заметки и интерпретации** поверх raw-источников.
 - `10_llm_meta` — схемы кластеров (cluster scheme) по scope-папкам.
 - `11_llm_collections_primary` — collections по `llm_primary_cluster`.
 - `11_llm_collections_candidate` — collections по `llm_candidate_clusters`.
