@@ -45,6 +45,24 @@ def safe_print(*args: object) -> None:
             print("[UNPRINTABLE OUTPUT]")
 
 
+def detect_default_vault() -> Path:
+    """
+    Пытаемся определить корень vault независимо от того,
+    лежит ли скрипт в scripts/ или в scripts/scripts/.
+    """
+    script_path = Path(__file__).resolve()
+    candidates = [script_path.parent, *script_path.parents]
+
+    for candidate in candidates:
+        has_commands = (candidate / "commands").is_dir()
+        has_agents = (candidate / "AGENTS.md").is_file()
+        if has_commands or has_agents:
+            return candidate
+
+    # Фолбэк: историческое поведение (корень = на 2 уровня выше файла)
+    return script_path.parent.parent
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="MVP-линтер knowledge base: диагностирует проблемы в generated layers и Zettelkasten."
@@ -52,7 +70,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--vault",
         type=Path,
-        default=Path(__file__).resolve().parent.parent,
+        default=detect_default_vault(),
         help="Путь к корню базы (по умолчанию: корень репозитория).",
     )
     parser.add_argument(
