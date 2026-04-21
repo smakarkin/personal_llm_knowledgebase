@@ -370,10 +370,14 @@ def save_report(query: str, stage1_matches: list[dict[str, Any]], stage2_notes: 
         "## Объяснение релевантности",
         "Критерий: совпадение смыслового ядра запроса с идеями из collections/concepts и подтверждение через source notes.",
         "",
-        "## Краткая synthesis/hypothesis",
-        synthesis or "_Нет synthesis/hypothesis._",
-        "",
     ])
+
+    if stage2_notes and synthesis.strip():
+        lines.extend([
+            "## Краткая synthesis/hypothesis",
+            synthesis,
+            "",
+        ])
 
     out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
@@ -395,8 +399,12 @@ def main():
     note_items = collect_source_notes(stage1_matches)
     safe_print("COLLECTED SOURCE NOTES:", len(note_items))
 
-    stage2_notes, synthesis = stage2_trace_notes(query, note_items)
-    safe_print("STAGE 2 NOTES:", len(stage2_notes))
+    if note_items:
+        stage2_notes, synthesis = stage2_trace_notes(query, note_items)
+        safe_print("STAGE 2 NOTES:", len(stage2_notes))
+    else:
+        stage2_notes, synthesis = [], ""
+        safe_print("STAGE 2 SKIPPED: no source notes")
 
     report_path = save_report(query, stage1_matches, stage2_notes, synthesis)
     safe_print("SAVED REPORT:", report_path)

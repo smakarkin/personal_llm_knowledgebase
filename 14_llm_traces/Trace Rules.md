@@ -25,4 +25,4 @@
 - найденные collections/concepts;
 - найденные source notes;
 - объяснение релевантности;
-- краткую synthesis/hypothesis.
+- краткую synthesis/hypothesis *(если есть source notes и синтез действительно восстановлен)*.
