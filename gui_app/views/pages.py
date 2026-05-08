@@ -20,7 +20,7 @@ from gui_app.services.state_inspector import KnowledgeBaseState, StateInspector
 
 PAGE_TITLES = [
     "Dashboard",
-    "Pipeline",
+    "Pipeline Map",
     "InBox",
     "Rebuild",
     "Trace",
@@ -188,6 +188,171 @@ def _fmt_dt(value: datetime | None) -> str:
     if value is None:
         return "нет файлов"
     return value.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+
+
+class PipelineMapPage(QWidget):
+    """Экран с картой этапов пайплайна и их текущим состоянием."""
+
+    _STATUS_STYLES = {
+        "ok": ("OK", "#E8F5E9", "#1B5E20"),
+        "needs_attention": ("Требует внимания", "#FFF8E1", "#8A4B00"),
+        "stale": ("Устарело", "#FFF3E0", "#A84300"),
+        "not_run": ("Не запускалось", "#F3F4F6", "#4B5563"),
+    }
+
+    def __init__(self, repo_root: Path, inbox_folder: str = "InBox") -> None:
+        super().__init__()
+        self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
+        self._rows: list[tuple[QLabel, QLabel, QPushButton, str]] = []
+        self._status_line = QLabel("")
+        self._build_ui()
+        self.refresh()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        title = QLabel("Pipeline Map")
+        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+
+        refresh_btn = QPushButton("Обновить")
+        refresh_btn.clicked.connect(self.refresh)
+
+        top = QHBoxLayout()
+        top.addWidget(title)
+        top.addStretch(1)
+        top.addWidget(refresh_btn)
+        layout.addLayout(top)
+        layout.addWidget(self._status_line)
+
+        self._list = QVBoxLayout()
+        self._list.setSpacing(8)
+        layout.addLayout(self._list)
+        layout.addStretch(1)
+
+    def refresh(self) -> None:
+        state = self._inspector.inspect()
+        self._status_line.setText(
+            f"Обновлено: {datetime.now(timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        )
+        while self._list.count():
+            item = self._list.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for step in _build_pipeline_steps(state):
+            self._list.addWidget(self._make_step_row(step))
+
+    def _make_step_row(self, step: dict[str, str]) -> QWidget:
+        wrap = QFrame()
+        wrap.setStyleSheet("QFrame { border: 1px solid #DDD; border-radius: 8px; }")
+        row = QHBoxLayout(wrap)
+        row.setContentsMargins(10, 8, 10, 8)
+        row.setSpacing(8)
+
+        name = QLabel(step["title"])
+        name.setStyleSheet("font-weight: 700;")
+        status_text, bg, fg = self._STATUS_STYLES[step["status"]]
+        status = QLabel(status_text)
+        status.setStyleSheet(f"padding: 2px 8px; border-radius: 10px; background: {bg}; color: {fg};")
+        explanation = QLabel(step["explanation"])
+        explanation.setWordWrap(True)
+        explanation.setStyleSheet("color: #444;")
+
+        link_btn = QPushButton(step["link"])
+        link_btn.setEnabled(bool(step["link"]))
+
+        text_col = QVBoxLayout()
+        text_col.addWidget(name)
+        text_col.addWidget(explanation)
+
+        row.addWidget(status, 0, Qt.AlignmentFlag.AlignTop)
+        row.addLayout(text_col, 1)
+        row.addWidget(link_btn, 0, Qt.AlignmentFlag.AlignTop)
+        return wrap
+
+
+def _build_pipeline_steps(state: KnowledgeBaseState) -> list[dict[str, str]]:
+    collections_latest = _newest(state.collections_primary_last_modified, state.collections_candidate_last_modified)
+    concepts_stale = _is_older(state.concepts_last_modified, collections_latest)
+    indexes_stale = _is_older(state.indexes_last_modified, state.concepts_last_modified)
+
+    return [
+        {
+            "title": "InBox ingest",
+            "status": "needs_attention" if state.inbox_markdown_count > 0 else "ok",
+            "explanation": (
+                f"Во входящих {state.inbox_markdown_count} заметок: нужен разбор."
+                if state.inbox_markdown_count > 0
+                else "Входящие пусты или уже разобраны."
+            ),
+            "link": "Перейти к InBox",
+        },
+        {
+            "title": "Classification",
+            "status": "needs_attention" if state.zettelkasten_missing_primary_cluster_count > 0 else "ok",
+            "explanation": (
+                f"Без llm_primary_cluster: {state.zettelkasten_missing_primary_cluster_count}."
+                if state.zettelkasten_missing_primary_cluster_count > 0
+                else "Ключевые llm-кластеры в заметках присутствуют."
+            ),
+            "link": "Перейти к Health",
+        },
+        {
+            "title": "Primary collections",
+            "status": "not_run" if state.collections_primary_count == 0 else "ok",
+            "explanation": f"Файлов primary collections: {state.collections_primary_count}.",
+            "link": "Перейти к Pipeline",
+        },
+        {
+            "title": "Candidate collections",
+            "status": "not_run" if state.collections_candidate_count == 0 else "ok",
+            "explanation": f"Файлов candidate collections: {state.collections_candidate_count}.",
+            "link": "Перейти к Pipeline",
+        },
+        {
+            "title": "Concepts",
+            "status": "not_run" if state.concepts_count == 0 else ("stale" if concepts_stale else "ok"),
+            "explanation": "Concepts отсутствуют." if state.concepts_count == 0 else (
+                "Concepts старее collections: рекомендуется пересборка." if concepts_stale else "Concepts актуальны относительно collections."
+            ),
+            "link": "Перейти к Pipeline",
+        },
+        {
+            "title": "Indexes",
+            "status": "not_run" if state.indexes_count == 0 else ("stale" if indexes_stale else "ok"),
+            "explanation": "Indexes отсутствуют." if state.indexes_count == 0 else (
+                "Indexes старее concepts: рекомендуется пересборка." if indexes_stale else "Indexes актуальны."
+            ),
+            "link": "Перейти к Pipeline",
+        },
+        {
+            "title": "Trace / semantic search",
+            "status": "not_run" if state.traces_count == 0 else "ok",
+            "explanation": f"Файлов trace-слоя: {state.traces_count}.",
+            "link": "Перейти к Trace",
+        },
+        {
+            "title": "Health check",
+            "status": "needs_attention" if state.diagnostics else "ok",
+            "explanation": "Найдены диагностические замечания." if state.diagnostics else "Проблемы путей и структуры не обнаружены.",
+            "link": "Перейти к Health",
+        },
+        {
+            "title": "Manual transfer to Zettelkasten",
+            "status": "needs_attention" if state.inbox_markdown_count > 0 else "ok",
+            "explanation": "Есть входящие, перенос в Zettelkasten ещё не завершён." if state.inbox_markdown_count > 0 else "Нет входящих для ручного переноса.",
+            "link": "Перейти к InBox",
+        },
+    ]
+
+
+def _is_older(target: datetime | None, baseline: datetime | None) -> bool:
+    return bool(target and baseline and target < baseline)
+
+
+def _newest(first: datetime | None, second: datetime | None) -> datetime | None:
+    values = [value for value in (first, second) if value is not None]
+    return max(values) if values else None
 
 
 def create_placeholder_page(title: str) -> QWidget:

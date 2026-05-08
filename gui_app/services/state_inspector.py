@@ -17,6 +17,8 @@ class KnowledgeBaseState:
     concepts_count: int
     indexes_count: int
     traces_count: int
+    inbox_last_modified: datetime | None
+    zettelkasten_last_modified: datetime | None
     collections_primary_last_modified: datetime | None
     collections_candidate_last_modified: datetime | None
     concepts_last_modified: datetime | None
@@ -55,6 +57,8 @@ class StateInspector:
         index_files = list(_iter_markdown_files(indexes_dir))
         trace_files = list(_iter_files(traces_dir))
 
+        inbox_last = _latest_mtime(inbox_markdowns)
+        zettelkasten_last = _latest_mtime(zettelkasten_markdowns)
         primary_last = _latest_mtime(primary_files)
         candidate_last = _latest_mtime(candidate_files)
         concepts_last = _latest_mtime(concept_files)
@@ -94,6 +98,8 @@ class StateInspector:
             concepts_count=len(concept_files),
             indexes_count=len(index_files),
             traces_count=len(trace_files),
+            inbox_last_modified=inbox_last,
+            zettelkasten_last_modified=zettelkasten_last,
             collections_primary_last_modified=primary_last,
             collections_candidate_last_modified=candidate_last,
             concepts_last_modified=concepts_last,
