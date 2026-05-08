@@ -33,8 +33,8 @@ class StateInspector:
         self.inbox_folder = inbox_folder
 
     def inspect(self) -> KnowledgeBaseState:
-        inbox = self.repo_root / self.inbox_folder
-        zettelkasten = self.repo_root / "Zettelkasten"
+        inbox, inbox_hint = _resolve_vault_dir(self.repo_root, self.inbox_folder)
+        zettelkasten, zettelkasten_hint = _resolve_vault_dir(self.repo_root, "Zettelkasten")
 
         inbox_markdowns = list(_iter_markdown_files(inbox))
         zettelkasten_markdowns = list(_iter_markdown_files(zettelkasten))
@@ -43,11 +43,11 @@ class StateInspector:
             1 for note_path in zettelkasten_markdowns if not _has_nonempty_frontmatter_key(note_path, "llm_primary_cluster")
         )
 
-        primary_dir = self.repo_root / "11_llm_collections_primary"
-        candidate_dir = self.repo_root / "11_llm_collections_candidate"
-        concepts_dir = self.repo_root / "12_llm_concepts"
-        indexes_dir = self.repo_root / "13_llm_indexes"
-        traces_dir = self.repo_root / "14_llm_traces"
+        primary_dir, primary_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_primary")
+        candidate_dir, candidate_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_candidate")
+        concepts_dir, concepts_hint = _resolve_vault_dir(self.repo_root, "12_llm_concepts")
+        indexes_dir, indexes_hint = _resolve_vault_dir(self.repo_root, "13_llm_indexes")
+        traces_dir, traces_hint = _resolve_vault_dir(self.repo_root, "14_llm_traces")
 
         primary_files = list(_iter_markdown_files(primary_dir))
         candidate_files = list(_iter_markdown_files(candidate_dir))
@@ -73,6 +73,7 @@ class StateInspector:
             concept_files=concept_files,
             index_files=index_files,
             trace_files=trace_files,
+            hints=[inbox_hint, zettelkasten_hint, primary_hint, candidate_hint, concepts_hint, indexes_hint, traces_hint],
         )
 
         recommendation = self._build_recommendation(
@@ -117,8 +118,13 @@ class StateInspector:
         concept_files: list[Path],
         index_files: list[Path],
         trace_files: list[Path],
+        hints: list[str | None],
     ) -> list[str]:
         diagnostics: list[str] = []
+
+        for hint in hints:
+            if hint:
+                diagnostics.append(hint)
 
         for folder in (inbox, zettelkasten, primary_dir, candidate_dir, concepts_dir, indexes_dir, traces_dir):
             if not folder.exists():
@@ -201,3 +207,23 @@ def _has_nonempty_frontmatter_key(note_path: Path, key: str) -> bool:
             value = line.split(":", 1)[1].strip()
             return bool(value)
     return False
+
+
+def _resolve_vault_dir(repo_root: Path, configured_name: str) -> tuple[Path, str | None]:
+    exact = repo_root / configured_name
+    if exact.exists():
+        return exact, None
+
+    normalized_target = _normalize_folder_name(configured_name)
+    candidates = [p for p in repo_root.iterdir() if p.is_dir() and _normalize_folder_name(p.name) == normalized_target]
+    if candidates:
+        picked = sorted(candidates, key=lambda item: (item.name != configured_name, item.name))[0]
+        return picked, (
+            f"Папка '{configured_name}' не найдена, используется '{picked.name}' (правило нормализации имён)."
+        )
+
+    return exact, None
+
+
+def _normalize_folder_name(name: str) -> str:
+    return name.strip().lstrip("_").lower().replace("-", "_")
