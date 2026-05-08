@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import re
 
 
 @dataclass
@@ -25,6 +26,16 @@ class KnowledgeBaseState:
     indexes_last_modified: datetime | None
     recommended_next_step: str
     diagnostics: list[str]
+
+@dataclass(frozen=True)
+class InboxNoteState:
+    file_name: str
+    path: Path
+    has_primary_cluster: bool
+    has_candidate_clusters: bool
+    has_skip_reason: bool
+    is_empty: bool
+    is_ready_for_transfer: bool
 
 
 class StateInspector:
@@ -107,6 +118,37 @@ class StateInspector:
             recommended_next_step=recommendation,
             diagnostics=diagnostics,
         )
+
+    def inspect_inbox_notes(self) -> list[InboxNoteState]:
+        inbox, _ = _resolve_vault_dir(self.repo_root, self.inbox_folder)
+        notes: list[InboxNoteState] = []
+        for note_path in sorted(_iter_markdown_files(inbox), key=lambda item: item.name.lower()):
+            text = note_path.read_text(encoding="utf-8", errors="ignore")
+            body = _extract_body(text).strip()
+            frontmatter = _parse_frontmatter(text)
+
+            has_primary = _is_nonempty_value(frontmatter.get("llm_primary_cluster"))
+            has_candidates = _is_nonempty_value(frontmatter.get("llm_candidate_clusters"))
+            has_skip_reason = _is_nonempty_value(frontmatter.get("llm_skip_reason"))
+            has_semantic_type = _is_nonempty_value(frontmatter.get("llm_semantic_type"))
+            has_topic = _is_nonempty_value(frontmatter.get("llm_topic"))
+            has_processed = str(frontmatter.get("llm_processed", "")).strip().lower() == "true"
+            has_meaningful_markup = has_primary or has_candidates or has_semantic_type or has_topic or has_processed
+            is_empty = not body
+            is_ready_for_transfer = (not is_empty) and (not has_skip_reason) and has_meaningful_markup
+
+            notes.append(
+                InboxNoteState(
+                    file_name=note_path.name,
+                    path=note_path,
+                    has_primary_cluster=has_primary,
+                    has_candidate_clusters=has_candidates,
+                    has_skip_reason=has_skip_reason,
+                    is_empty=is_empty,
+                    is_ready_for_transfer=is_ready_for_transfer,
+                )
+            )
+        return notes
 
 
     def _collect_diagnostics(
@@ -233,3 +275,35 @@ def _resolve_vault_dir(repo_root: Path, configured_name: str) -> tuple[Path, str
 
 def _normalize_folder_name(name: str) -> str:
     return name.strip().lstrip("_").lower().replace("-", "_")
+
+
+def _parse_frontmatter(text: str) -> dict[str, str]:
+    if not text.startswith("---\n"):
+        return {}
+    lines = text.splitlines()
+    result: dict[str, str] = {}
+    for idx in range(1, len(lines)):
+        line = lines[idx]
+        if line.strip() == "---":
+            break
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        result[key.strip()] = value.strip()
+    return result
+
+
+def _extract_body(text: str) -> str:
+    if not text.startswith("---\n"):
+        return text
+    parts = re.split(r"^---\s*$", text, maxsplit=2, flags=re.MULTILINE)
+    if len(parts) < 3:
+        return ""
+    return parts[2]
+
+
+def _is_nonempty_value(value: str | None) -> bool:
+    if value is None:
+        return False
+    normalized = str(value).strip()
+    return bool(normalized and normalized not in {"[]", "''", '""', "null", "None"})

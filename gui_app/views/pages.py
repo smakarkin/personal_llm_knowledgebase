@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -19,10 +21,12 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QVBoxLayout,
     QWidget,
+    QTableWidget,
+    QTableWidgetItem,
 )
 
-from gui_app.services.script_runner import ScriptRunner, ScriptScenario, build_rebuild_scenarios
-from gui_app.services.state_inspector import KnowledgeBaseState, StateInspector
+from gui_app.services.script_runner import ScriptRunner, ScriptScenario, ScriptStep, build_rebuild_scenarios
+from gui_app.services.state_inspector import InboxNoteState, KnowledgeBaseState, StateInspector
 
 PAGE_TITLES = [
     "Dashboard",
@@ -404,6 +408,114 @@ class RebuildPage(QWidget):
 
     def _append_log(self, text: str) -> None:
         self._log.appendPlainText(text)
+
+
+class InBoxPage(QWidget):
+    """Экран мониторинга InBox без автоматического переноса заметок."""
+
+    def __init__(self, repo_root: Path, scripts_path: Path, inbox_folder: str = "InBox") -> None:
+        super().__init__()
+        self._repo_root = repo_root
+        self._inbox_folder = inbox_folder
+        self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
+        self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
+        self._worker: _ScenarioWorker | None = None
+
+        self._stats = QLabel("")
+        self._status_line = QLabel("")
+        self._table = QTableWidget()
+        self._classify_btn = QPushButton("Запустить классификацию InBox")
+        self._open_folder_btn = QPushButton("Открыть папку InBox")
+        self._refresh_btn = QPushButton("Обновить")
+        self._hint = QLabel(
+            "Важно: перенос заметок в Zettelkasten выполняется вручную в Obsidian. "
+            "GUI только показывает состояние и готовность к переносу."
+        )
+        self._build_ui()
+        self.refresh()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        title = QLabel("InBox")
+        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+        self._hint.setWordWrap(True)
+        self._hint.setStyleSheet("color: #8A4B00;")
+
+        controls = QHBoxLayout()
+        controls.addWidget(self._classify_btn)
+        controls.addWidget(self._open_folder_btn)
+        controls.addStretch(1)
+        controls.addWidget(self._refresh_btn)
+
+        self._table.setColumnCount(6)
+        self._table.setHorizontalHeaderLabels(
+            ["Файл", "primary", "candidate", "skip_reason", "Пустая", "Статус"]
+        )
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._table.horizontalHeader().setStretchLastSection(True)
+
+        self._classify_btn.clicked.connect(self._run_classification)
+        self._open_folder_btn.clicked.connect(self._open_inbox_folder)
+        self._refresh_btn.clicked.connect(self.refresh)
+
+        layout.addWidget(title)
+        layout.addWidget(self._hint)
+        layout.addLayout(controls)
+        layout.addWidget(self._stats)
+        layout.addWidget(self._status_line)
+        layout.addWidget(self._table, 1)
+
+    def refresh(self) -> None:
+        notes = self._inspector.inspect_inbox_notes()
+        ready = sum(1 for note in notes if note.is_ready_for_transfer)
+        needs_attention = len(notes) - ready
+        self._stats.setText(
+            f"Всего заметок: {len(notes)} | Готово к переносу: {ready} | Требуют внимания: {needs_attention}"
+        )
+        self._status_line.setText(
+            f"Критерий готовности: не пустая, без llm_skip_reason, есть осмысленная llm-разметка."
+        )
+        self._fill_table(notes)
+
+    def _fill_table(self, notes: list[InboxNoteState]) -> None:
+        self._table.setRowCount(len(notes))
+        for row, note in enumerate(notes):
+            self._table.setItem(row, 0, QTableWidgetItem(note.file_name))
+            self._table.setItem(row, 1, QTableWidgetItem("Да" if note.has_primary_cluster else "Нет"))
+            self._table.setItem(row, 2, QTableWidgetItem("Да" if note.has_candidate_clusters else "Нет"))
+            self._table.setItem(row, 3, QTableWidgetItem("Да" if note.has_skip_reason else "Нет"))
+            self._table.setItem(row, 4, QTableWidgetItem("Да" if note.is_empty else "Нет"))
+            self._table.setItem(
+                row, 5, QTableWidgetItem("Готово к переносу" if note.is_ready_for_transfer else "Ещё требует обработки")
+            )
+        self._table.resizeColumnsToContents()
+
+    def _run_classification(self) -> None:
+        scenario = ScriptScenario(
+            key="classify_inbox_only",
+            title="Классификация InBox",
+            description=f"Запуск propose_clusters.py для папки {self._inbox_folder}.",
+            steps=(ScriptStep("Классификация InBox", "propose_clusters.py", (self._inbox_folder,)),),
+        )
+        self._classify_btn.setEnabled(False)
+        self._status_line.setText("Запуск классификации InBox...")
+        self._worker = _ScenarioWorker(self._runner, scenario)
+        self._worker.finished_with_code.connect(self._on_classification_finished)
+        self._worker.start()
+
+    def _on_classification_finished(self, code: int) -> None:
+        self._classify_btn.setEnabled(True)
+        self._status_line.setText("Классификация завершена успешно." if code == 0 else "Классификация завершилась с ошибкой.")
+        self.refresh()
+
+    def _open_inbox_folder(self) -> None:
+        inbox_path, _ = self._inspector.repo_root / self._inbox_folder, None
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(inbox_path)))
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[dict[str, str]]:
