@@ -1,0 +1,337 @@
+========================================== 
+Полное обновление knowledge layer 
+Каталог: Zettelkasten 
+========================================== 
+
+=========================
+1. Дозаполнение схемы и классификации
+=========================
+FOLDER: Zettelkasten
+FOLDER PATH: C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten\Zettelkasten
+ALL NOTES: 2022
+EXISTING SCHEME FOUND
+SCHEME CLUSTERS: 12
+PROGRESS: 2022/2022 | REMAINING: 0
+Готово: в каталоге не осталось необработанных заметок.
+
+=========================
+2. Пересборка primary-collections
+=========================
+FOLDER: Zettelkasten
+FOLDER PATH: C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten\Zettelkasten
+MODE: primary
+NOTES FOUND: 2022
+SKIP empty body: Карты Бурья.md
+CLUSTERS FOUND: 36
+[1/36] CLUSTER: философские концепции | NOTES: 152
+SAVED: философские концепции - primary.md
+[2/36] CLUSTER: управление знаниями | NOTES: 35
+SAVED: управление знаниями - primary.md
+[3/36] CLUSTER: консалтинг и бизнес | NOTES: 215
+SAVED: консалтинг и бизнес - primary.md
+[4/36] CLUSTER: коммуникации и объяснение | NOTES: 92
+SAVED: коммуникации и объяснение - primary.md
+[5/36] CLUSTER: ментальные модели | NOTES: 39
+SAVED: ментальные модели - primary.md
+[6/36] CLUSTER: принципы и правила | NOTES: 299
+SAVED: принципы и правила - primary.md
+[7/36] CLUSTER: методы анализа | NOTES: 52
+SAVED: методы анализа - primary.md
+[8/36] CLUSTER: идеи и размышления | NOTES: 205
+SAVED: идеи и размышления - primary.md
+[9/36] CLUSTER: социальные системы | NOTES: 176
+SAVED: социальные системы - primary.md
+[10/36] CLUSTER: психология и самопознание | NOTES: 245
+SAVED: психология и самопознание - primary.md
+[11/36] CLUSTER: производительность и организация | NOTES: 49
+SAVED: производительность и организация - primary.md
+[12/36] CLUSTER: принятие решений | NOTES: 53
+SAVED: принятие решений - primary.md
+[13/36] CLUSTER: первый_шаг_осознанности | NOTES: 1
+[13/36] SKIP too small: первый_шаг_осознанности
+[14/36] CLUSTER: meditation techniques | NOTES: 1
+[14/36] SKIP too small: meditation techniques
+[15/36] CLUSTER: практические указания по медитации | NOTES: 1
+[15/36] SKIP too small: практические указания по медитации
+[16/36] CLUSTER: медитативная практика, осознанность тела, расслабление | NOTES: 1
+[16/36] SKIP too small: медитативная практика, осознанность тела, расслабление
+[17/36] CLUSTER: поэтическое наблюдение природы и философское размышление | NOTES: 1
+[17/36] SKIP too small: поэтическое наблюдение природы и философское размышление
+[18/36] CLUSTER: продукты и услуги | NOTES: 1
+[18/36] SKIP too small: продукты и услуги
+[19/36] CLUSTER: консалтинг и коучинг | NOTES: 3
+SAVED: консалтинг и коучинг - primary.md
+[20/36] CLUSTER: meditation_practice_limits | NOTES: 1
+[20/36] SKIP too small: meditation_practice_limits
+[21/36] CLUSTER: модели и стратегии | NOTES: 1
+[21/36] SKIP too small: модели и стратегии
+[22/36] CLUSTER: эффективность и результат | NOTES: 1
+[22/36] SKIP too small: эффективность и результат
+[23/36] CLUSTER: клиенты и отношения | NOTES: 1
+[23/36] SKIP too small: клиенты и отношения
+[24/36] CLUSTER: продажи и маркетинг | NOTES: 1
+[24/36] SKIP too small: продажи и маркетинг
+[25/36] CLUSTER: стратегия и планирование | NOTES: 38
+SAVED: стратегия и планирование - primary.md
+[26/36] CLUSTER: эксперименты и адаптация | NOTES: 9
+SAVED: эксперименты и адаптация - primary.md
+[27/36] CLUSTER: мышление и восприятие | NOTES: 23
+SAVED: мышление и восприятие - primary.md
+[28/36] CLUSTER: психология и эмоции | NOTES: 38
+SAVED: психология и эмоции - primary.md
+[29/36] CLUSTER: управление и лидерство | NOTES: 35
+SAVED: управление и лидерство - primary.md
+[30/36] CLUSTER: методы и инструменты | NOTES: 73
+SAVED: методы и инструменты - primary.md
+[31/36] CLUSTER: саморазвитие и практики | NOTES: 20
+SAVED: саморазвитие и практики - primary.md
+[32/36] CLUSTER: архетипы и символизм | NOTES: 20
+SAVED: архетипы и символизм - primary.md
+[33/36] CLUSTER: рефлексия и обратная связь | NOTES: 9
+SAVED: рефлексия и обратная связь - primary.md
+[34/36] CLUSTER: ценности и принципы | NOTES: 15
+SAVED: ценности и принципы - primary.md
+[35/36] CLUSTER: ссылки и материалы | NOTES: 86
+SAVED: ссылки и материалы - primary.md
+[36/36] CLUSTER: коммуникация и отношения | NOTES: 29
+SAVED: коммуникация и отношения - primary.md
+
+=========================
+3. Пересборка primary-concepts
+=========================
+MODE: primary
+COLLECTIONS FOUND: 29
+CLUSTERS FOUND: 29
+[1/29] BUILD CONCEPT: архетипы и символизм | collections: 1
+SAVED: Архетипическая инициация мужчины.md
+[2/29] BUILD CONCEPT: власть и влияние | collections: 1
+SAVED: Власть через контроль доступа и посредничество.md
+[3/29] BUILD CONCEPT: идеи и размышления | collections: 1
+SAVED: Личное философское исследование.md
+[4/29] BUILD CONCEPT: коммуникации и объяснение | collections: 1
+SAVED: Осознанная коммуникация.md
+[5/29] BUILD CONCEPT: коммуникация и отношения | collections: 1
+SAVED: Осознанная коммуникация.md
+[6/29] BUILD CONCEPT: консалтинг и бизнес | collections: 1
+SAVED: Агент организационных изменений.md
+[7/29] BUILD CONCEPT: консалтинг и коучинг | collections: 1
+SAVED: Консалтинг и коучинг как этичная упаковка Agile-внедрения.md
+[8/29] BUILD CONCEPT: литературный разбор | collections: 1
+SAVED: Придворная игра как скрытая борьба.md
+[9/29] BUILD CONCEPT: ментальные модели | collections: 1
+SAVED: Ментальные модели.md
+[10/29] BUILD CONCEPT: мета-заметки | collections: 1
+SAVED: Структурированный анализ власти.md
+[11/29] BUILD CONCEPT: методы анализа | collections: 1
+SAVED: Методы анализа.md
+[12/29] BUILD CONCEPT: методы и инструменты | collections: 1
+SAVED: Прикладные протоколы и микроинструменты.md
+[13/29] BUILD CONCEPT: мышление и восприятие | collections: 1
+SAVED: Конструирование реальности через восприятие и мышление.md
+[14/29] BUILD CONCEPT: практики и упражнения | collections: 1
+SAVED: Практики деконструкции власти.md
+[15/29] BUILD CONCEPT: принципы и правила | collections: 1
+SAVED: Правила и эвристики для действия.md
+[16/29] BUILD CONCEPT: принятие решений | collections: 1
+SAVED: Принятие решений.md
+[17/29] BUILD CONCEPT: производительность и организация | collections: 1
+SAVED: Система личной продуктивности.md
+[18/29] BUILD CONCEPT: психология и самопознание | collections: 1
+SAVED: Осознанное самопознание.md
+[19/29] BUILD CONCEPT: психология и эмоции | collections: 1
+SAVED: Эмоциональная грамотность как основа устойчивости.md
+[20/29] BUILD CONCEPT: рефлексия и обратная связь | collections: 1
+SAVED: Рефлексивная калибровка.md
+[21/29] BUILD CONCEPT: саморазвитие и практики | collections: 1
+SAVED: Практика как образ жизни.md
+[22/29] BUILD CONCEPT: социальные системы | collections: 1
+SAVED: Социальная система.md
+[23/29] BUILD CONCEPT: ссылки и материалы | collections: 1
+SAVED: Архив внешних указателей.md
+[24/29] BUILD CONCEPT: стратегия и планирование | collections: 1
+SAVED: Стратегическое планирование в условиях неопределённости.md
+[25/29] BUILD CONCEPT: управление знаниями | collections: 1
+SAVED: Управление знаниями.md
+[26/29] BUILD CONCEPT: управление и лидерство | collections: 1
+SAVED: Управление как создание условий.md
+[27/29] BUILD CONCEPT: философские концепции | collections: 1
+SAVED: Философская концепция.md
+[28/29] BUILD CONCEPT: ценности и принципы | collections: 1
+SAVED: Личная целостность через ценности и границы.md
+[29/29] BUILD CONCEPT: эксперименты и адаптация | collections: 1
+SAVED: Экспериментальная адаптация.md
+
+=========================
+4. Пересборка primary-index
+=========================
+MODE: primary
+COLLECTIONS FOUND: 29
+CONCEPTS FOUND: 64
+[1/1] BUILD INDEX: primary
+SAVED: Primary index.md
+
+=========================
+5. Пересборка candidate-collections
+=========================
+FOLDER: Zettelkasten
+FOLDER PATH: C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten\Zettelkasten
+MODE: candidate
+NOTES FOUND: 2022
+SKIP empty body: Карты Бурья.md
+CLUSTERS FOUND: 29
+[1/29] CLUSTER: философские концепции | NOTES: 405
+SAVED: философские концепции - candidate.md
+[2/29] CLUSTER: консалтинг и бизнес | NOTES: 553
+SAVED: консалтинг и бизнес - candidate.md
+[3/29] CLUSTER: идеи и размышления | NOTES: 1126
+SAVED: идеи и размышления - candidate.md
+[4/29] CLUSTER: методы анализа | NOTES: 595
+SAVED: методы анализа - candidate.md
+[5/29] CLUSTER: ментальные модели | NOTES: 880
+SAVED: ментальные модели - candidate.md
+[6/29] CLUSTER: социальные системы | NOTES: 478
+SAVED: социальные системы - candidate.md
+[7/29] CLUSTER: принципы и правила | NOTES: 1445
+SAVED: принципы и правила - candidate.md
+[8/29] CLUSTER: управление знаниями | NOTES: 515
+SAVED: управление знаниями - candidate.md
+[9/29] CLUSTER: производительность и организация | NOTES: 346
+SAVED: производительность и организация - candidate.md
+[10/29] CLUSTER: принятие решений | NOTES: 433
+SAVED: принятие решений - candidate.md
+[11/29] CLUSTER: коммуникации и объяснение | NOTES: 418
+SAVED: коммуникации и объяснение - candidate.md
+[12/29] CLUSTER: психология и самопознание | NOTES: 786
+SAVED: психология и самопознание - candidate.md
+[13/29] CLUSTER: воспитание | NOTES: 1
+[13/29] SKIP too small: воспитание
+[14/29] CLUSTER: творчество | NOTES: 1
+[14/29] SKIP too small: творчество
+[15/29] CLUSTER: политические концепции | NOTES: 1
+[15/29] SKIP too small: политические концепции
+[16/29] CLUSTER: менедльные модели | NOTES: 1
+[16/29] SKIP too small: менедльные модели
+[17/29] CLUSTER: стратегия и планирование | NOTES: 158
+SAVED: стратегия и планирование - candidate.md
+[18/29] CLUSTER: управление и лидерство | NOTES: 223
+SAVED: управление и лидерство - candidate.md
+[19/29] CLUSTER: методы и инструменты | NOTES: 238
+SAVED: методы и инструменты - candidate.md
+[20/29] CLUSTER: эксперименты и адаптация | NOTES: 135
+SAVED: эксперименты и адаптация - candidate.md
+[21/29] CLUSTER: мышление и восприятие | NOTES: 189
+SAVED: мышление и восприятие - candidate.md
+[22/29] CLUSTER: коммуникация и отношения | NOTES: 124
+SAVED: коммуникация и отношения - candidate.md
+[23/29] CLUSTER: психология и эмоции | NOTES: 169
+SAVED: психология и эмоции - candidate.md
+[24/29] CLUSTER: ценности и принципы | NOTES: 145
+SAVED: ценности и принципы - candidate.md
+[25/29] CLUSTER: рефлексия и обратная связь | NOTES: 149
+SAVED: рефлексия и обратная связь - candidate.md
+[26/29] CLUSTER: саморазвитие и практики | NOTES: 219
+SAVED: саморазвитие и практики - candidate.md
+[27/29] CLUSTER: архетипы и символизм | NOTES: 45
+SAVED: архетипы и символизм - candidate.md
+[28/29] CLUSTER: ссылки и материалы | NOTES: 107
+SAVED: ссылки и материалы - candidate.md
+[29/29] CLUSTER: личная эффективность | NOTES: 1
+[29/29] SKIP too small: личная эффективность
+
+=========================
+6. Пересборка candidate-concepts
+=========================
+MODE: candidate
+COLLECTIONS FOUND: 34
+CLUSTERS FOUND: 34
+[1/34] BUILD CONCEPT: анализ и стратегия | collections: 1
+SAVED: Стратегическая ориентация.md
+[2/34] BUILD CONCEPT: архетипы и символизм | collections: 1
+SAVED: Архетипическая инициация.md
+[3/34] BUILD CONCEPT: власть и влияние | collections: 1
+SAVED: Власть и влияние.md
+[4/34] BUILD CONCEPT: идеи и размышления | collections: 1
+SAVED: Практическая мудрость.md
+[5/34] BUILD CONCEPT: коммуникации и объяснение | collections: 1
+SAVED: Осознанная коммуникация.md
+[6/34] BUILD CONCEPT: коммуникация и отношения | collections: 1
+SAVED: Управление через связь.md
+[7/34] BUILD CONCEPT: коммуникация и язык | collections: 1
+SAVED: Политическая коммуникация как управление через язык и протокол.md
+[8/34] BUILD CONCEPT: консалтинг и бизнес | collections: 1
+SAVED: Агент изменений.md
+[9/34] BUILD CONCEPT: культура и общество | collections: 1
+SAVED: Протокольное маневрирование.md
+[10/34] BUILD CONCEPT: литературный разбор | collections: 1
+SAVED: Придворная игра власти.md
+[11/34] BUILD CONCEPT: ментальные модели | collections: 1
+SAVED: Ментальные модели.md
+[12/34] BUILD CONCEPT: мета-заметки | collections: 1
+SAVED: Структурированный анализ власти в литературе.md
+[13/34] BUILD CONCEPT: методы анализа | collections: 1
+SAVED: Методы анализа.md
+[14/34] BUILD CONCEPT: методы и инструменты | collections: 1
+SAVED: Практический метод.md
+[15/34] BUILD CONCEPT: мышление и восприятие | collections: 1
+SAVED: Конструирование опыта.md
+[16/34] BUILD CONCEPT: организация и логистика | collections: 1
+SAVED: Маневренная организация.md
+[17/34] BUILD CONCEPT: перенос в жизнь | collections: 1
+SAVED: Перенос стратегий в жизнь.md
+[18/34] BUILD CONCEPT: перенос идей в реальность | collections: 1
+SAVED: Перенос идей в реальность.md
+[19/34] BUILD CONCEPT: практики и упражнения | collections: 1
+SAVED: Практики переноса литературных инсайтов.md
+[20/34] BUILD CONCEPT: принципы и правила | collections: 1
+SAVED: Принципы и правила как опора для действий.md
+[21/34] BUILD CONCEPT: принятие решений | collections: 1
+SAVED: Стратегическое принятие решений.md
+[22/34] BUILD CONCEPT: производительность и организация | collections: 1
+SAVED: Система личной и командной продуктивности.md
+[23/34] BUILD CONCEPT: психология и самопознание | collections: 1
+SAVED: Осознанное самопознание.md
+[24/34] BUILD CONCEPT: психология и эмоции | collections: 1
+SAVED: Конструирование эмоционального опыта.md
+[25/34] BUILD CONCEPT: рефлексия и обратная связь | collections: 1
+SAVED: Рефлексивная обратная связь.md
+[26/34] BUILD CONCEPT: саморазвитие и практики | collections: 1
+SAVED: Практика как путь трансформации.md
+[27/34] BUILD CONCEPT: социальные системы | collections: 1
+SAVED: Социальная система.md
+[28/34] BUILD CONCEPT: ссылки и материалы | collections: 1
+SAVED: Коллекция внешних ресурсов и заметок для последующего изучения.md
+[29/34] BUILD CONCEPT: стратегия и планирование | collections: 1
+SAVED: Стратегия как живой процесс.md
+[30/34] BUILD CONCEPT: управление знаниями | collections: 1
+SAVED: Управление знаниями.md
+[31/34] BUILD CONCEPT: управление и лидерство | collections: 1
+SAVED: Управление как выращивание субъектности.md
+[32/34] BUILD CONCEPT: философские концепции | collections: 1
+SAVED: Практическая философия как образ жизни.md
+[33/34] BUILD CONCEPT: ценности и принципы | collections: 1
+SAVED: Ценности и принципы как основа управления.md
+[34/34] BUILD CONCEPT: эксперименты и адаптация | collections: 1
+SAVED: Экспериментирование и адаптация.md
+
+=========================
+7. Пересборка candidate-index
+=========================
+MODE: candidate
+COLLECTIONS FOUND: 34
+CONCEPTS FOUND: 45
+[1/1] BUILD INDEX: candidate
+SAVED: Candidate index.md
+
+=========================
+8. Обновление Knowledge index
+=========================
+SAVED: C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten\13_llm_indexes\Knowledge index.md
+
+=========================
+8. Обновление Knowledge index
+=========================
+SAVED: C:\Users\smaka\OneDrive\Документы\04_Zettelkasten\Zettelkasten\13_llm_indexes\Knowledge index.md
+
+=========================
+Готово
+=========================
