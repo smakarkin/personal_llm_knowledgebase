@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Iterable
 
+from gui_app.models.status_models import RebuildScenario, RebuildStep
+
 
 @dataclass
 class ScriptResult:
@@ -15,25 +17,6 @@ class ScriptResult:
     return_code: int
     stdout: str
     stderr: str
-
-
-@dataclass(frozen=True)
-class ScriptStep:
-    """Один шаг сценария запуска."""
-
-    title: str
-    script_name: str
-    args: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class ScriptScenario:
-    """Сценарий, состоящий из последовательности шагов."""
-
-    key: str
-    title: str
-    description: str
-    steps: tuple[ScriptStep, ...]
 
 
 class ScriptRunner:
@@ -72,9 +55,9 @@ class ScriptRunner:
 
     def run_scenario(
         self,
-        scenario: ScriptScenario,
+        scenario: RebuildScenario,
         *,
-        on_step_start: Callable[[int, int, ScriptStep], None] | None = None,
+        on_step_start: Callable[[int, int, RebuildStep], None] | None = None,
         on_output: Callable[[str], None] | None = None,
     ) -> list[ScriptResult]:
         """Последовательно выполняет шаги сценария."""
@@ -119,53 +102,55 @@ class ScriptRunner:
         return ScriptResult(return_code=return_code, stdout=output, stderr="")
 
 
-def build_rebuild_scenarios(inbox_folder: str = "InBox", zettelkasten_folder: str = "Zettelkasten") -> list[ScriptScenario]:
+from gui_app.config import DEFAULT_INBOX_FOLDER, DEFAULT_ZETTELKASTEN_FOLDER
+
+def build_rebuild_scenarios(inbox_folder: str = DEFAULT_INBOX_FOLDER, zettelkasten_folder: str = DEFAULT_ZETTELKASTEN_FOLDER) -> list[RebuildScenario]:
     """Возвращает централизованное описание сценариев для экрана Rebuild."""
     return [
-        ScriptScenario(
+        RebuildScenario(
             key="classify_inbox",
             title="Дозаполнить классификацию InBox",
             description=f"Запустить propose_clusters.py для папки {inbox_folder}.",
-            steps=(ScriptStep("Классификация InBox", "propose_clusters.py", (inbox_folder,)),),
+            steps=(RebuildStep("Классификация InBox", "propose_clusters.py", (inbox_folder,)),),
         ),
-        ScriptScenario(
+        RebuildScenario(
             key="classify_zettelkasten",
             title="Дозаполнить классификацию Zettelkasten",
             description=f"Запустить propose_clusters.py для папки {zettelkasten_folder}.",
-            steps=(ScriptStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),),
+            steps=(RebuildStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),),
         ),
-        ScriptScenario(
+        RebuildScenario(
             key="rebuild_primary",
             title="Пересобрать primary layer",
             description="Collections -> Concepts -> Index для режима primary.",
             steps=(
-                ScriptStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
-                ScriptStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
-                ScriptStep("Генерация primary index", "generate_index.py", ("primary",)),
+                RebuildStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
+                RebuildStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
+                RebuildStep("Генерация primary index", "generate_index.py", ("primary",)),
             ),
         ),
-        ScriptScenario(
+        RebuildScenario(
             key="rebuild_candidate",
             title="Пересобрать candidate layer",
             description="Collections -> Concepts -> Index для режима candidate.",
             steps=(
-                ScriptStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
-                ScriptStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
-                ScriptStep("Генерация candidate index", "generate_index.py", ("candidate",)),
+                RebuildStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
+                RebuildStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
+                RebuildStep("Генерация candidate index", "generate_index.py", ("candidate",)),
             ),
         ),
-        ScriptScenario(
+        RebuildScenario(
             key="rebuild_full",
             title="Полная пересборка knowledge layer",
             description="Классификация папки, затем полные primary и candidate этапы.",
             steps=(
-                ScriptStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),
-                ScriptStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
-                ScriptStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
-                ScriptStep("Генерация primary index", "generate_index.py", ("primary",)),
-                ScriptStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
-                ScriptStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
-                ScriptStep("Генерация candidate index", "generate_index.py", ("candidate",)),
+                RebuildStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),
+                RebuildStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
+                RebuildStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
+                RebuildStep("Генерация primary index", "generate_index.py", ("primary",)),
+                RebuildStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
+                RebuildStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
+                RebuildStep("Генерация candidate index", "generate_index.py", ("candidate",)),
             ),
         ),
     ]

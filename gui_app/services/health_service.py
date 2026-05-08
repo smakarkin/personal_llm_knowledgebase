@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
+from gui_app.config import LLM_TRACES_DIR
 from gui_app.services.script_runner import ScriptResult, ScriptRunner
 
 
@@ -42,7 +43,7 @@ class HealthService:
         return result, self.load_report(report_path)
 
     def latest_report_path(self) -> Path | None:
-        reports = sorted((self._repo_root / "14_llm_traces").glob("Knowledge base health report - *.md"), reverse=True)
+        reports = sorted((self._repo_root / LLM_TRACES_DIR).glob("Knowledge base health report - *.md"), reverse=True)
         return reports[0] if reports else None
 
     def load_latest_report(self) -> HealthData:

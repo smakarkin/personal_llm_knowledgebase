@@ -2,40 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import re
 
 
-@dataclass
-class KnowledgeBaseState:
-    inbox_markdown_count: int
-    zettelkasten_markdown_count: int
-    zettelkasten_missing_primary_cluster_count: int
-    collections_primary_count: int
-    collections_candidate_count: int
-    concepts_count: int
-    indexes_count: int
-    traces_count: int
-    inbox_last_modified: datetime | None
-    zettelkasten_last_modified: datetime | None
-    collections_primary_last_modified: datetime | None
-    collections_candidate_last_modified: datetime | None
-    concepts_last_modified: datetime | None
-    indexes_last_modified: datetime | None
-    recommended_next_step: str
-    diagnostics: list[str]
-
-@dataclass(frozen=True)
-class InboxNoteState:
-    file_name: str
-    path: Path
-    has_primary_cluster: bool
-    has_candidate_clusters: bool
-    has_skip_reason: bool
-    is_empty: bool
-    is_ready_for_transfer: bool
+from gui_app.config import DEFAULT_ZETTELKASTEN_FOLDER, LLM_COLLECTIONS_CANDIDATE_DIR, LLM_COLLECTIONS_PRIMARY_DIR, LLM_CONCEPTS_DIR, LLM_INDEXES_DIR, LLM_TRACES_DIR
+from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState
 
 
 class StateInspector:
@@ -47,7 +20,7 @@ class StateInspector:
 
     def inspect(self) -> KnowledgeBaseState:
         inbox, inbox_hint = _resolve_vault_dir(self.repo_root, self.inbox_folder)
-        zettelkasten, zettelkasten_hint = _resolve_vault_dir(self.repo_root, "Zettelkasten")
+        zettelkasten, zettelkasten_hint = _resolve_vault_dir(self.repo_root, DEFAULT_ZETTELKASTEN_FOLDER)
 
         inbox_markdowns = list(_iter_markdown_files(inbox))
         zettelkasten_markdowns = list(_iter_markdown_files(zettelkasten))
@@ -56,11 +29,11 @@ class StateInspector:
             1 for note_path in zettelkasten_markdowns if not _has_nonempty_frontmatter_key(note_path, "llm_primary_cluster")
         )
 
-        primary_dir, primary_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_primary")
-        candidate_dir, candidate_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_candidate")
-        concepts_dir, concepts_hint = _resolve_vault_dir(self.repo_root, "12_llm_concepts")
-        indexes_dir, indexes_hint = _resolve_vault_dir(self.repo_root, "13_llm_indexes")
-        traces_dir, traces_hint = _resolve_vault_dir(self.repo_root, "14_llm_traces")
+        primary_dir, primary_hint = _resolve_vault_dir(self.repo_root, LLM_COLLECTIONS_PRIMARY_DIR)
+        candidate_dir, candidate_hint = _resolve_vault_dir(self.repo_root, LLM_COLLECTIONS_CANDIDATE_DIR)
+        concepts_dir, concepts_hint = _resolve_vault_dir(self.repo_root, LLM_CONCEPTS_DIR)
+        indexes_dir, indexes_hint = _resolve_vault_dir(self.repo_root, LLM_INDEXES_DIR)
+        traces_dir, traces_hint = _resolve_vault_dir(self.repo_root, LLM_TRACES_DIR)
 
         primary_files = list(_iter_markdown_files(primary_dir))
         candidate_files = list(_iter_markdown_files(candidate_dir))
@@ -119,9 +92,9 @@ class StateInspector:
             diagnostics=diagnostics,
         )
 
-    def inspect_inbox_notes(self) -> list[InboxNoteState]:
+    def inspect_inbox_notes(self) -> list[InboxNoteStatus]:
         inbox, _ = _resolve_vault_dir(self.repo_root, self.inbox_folder)
-        notes: list[InboxNoteState] = []
+        notes: list[InboxNoteStatus] = []
         for note_path in sorted(_iter_markdown_files(inbox), key=lambda item: item.name.lower()):
             text = note_path.read_text(encoding="utf-8", errors="ignore")
             body = _extract_body(text).strip()
@@ -138,7 +111,7 @@ class StateInspector:
             is_ready_for_transfer = (not is_empty) and (not has_skip_reason) and has_meaningful_markup
 
             notes.append(
-                InboxNoteState(
+                InboxNoteStatus(
                     file_name=note_path.name,
                     path=note_path,
                     has_primary_cluster=has_primary,
