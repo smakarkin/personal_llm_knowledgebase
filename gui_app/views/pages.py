@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QGridLayout,
+    QListWidget,
+    QListWidgetItem,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -27,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from gui_app.services.script_runner import ScriptRunner, ScriptScenario, ScriptStep, build_rebuild_scenarios
 from gui_app.services.state_inspector import InboxNoteState, KnowledgeBaseState, StateInspector
+from gui_app.services.trace_service import TraceRunResult, TraceService
 
 PAGE_TITLES = [
     "Dashboard",
@@ -516,6 +519,145 @@ class InBoxPage(QWidget):
     def _open_inbox_folder(self) -> None:
         inbox_path, _ = self._inspector.repo_root / self._inbox_folder, None
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(inbox_path)))
+
+
+
+
+class _TraceWorker(QThread):
+    output_line = Signal(str)
+    finished_with_result = Signal(object)
+
+    def __init__(self, service: TraceService, query: str) -> None:
+        super().__init__()
+        self._service = service
+        self._query = query
+
+    def run(self) -> None:
+        result = self._service.run_trace(self._query, on_output=lambda line: self.output_line.emit(line))
+        self.finished_with_result.emit(result)
+
+
+class TracePage(QWidget):
+    """Экран semantic trace-поиска по описанию идеи."""
+
+    def __init__(self, repo_root: Path, scripts_path: Path) -> None:
+        super().__init__()
+        self._service = TraceService(repo_root=repo_root, scripts_path=scripts_path)
+        self._worker: _TraceWorker | None = None
+        self._last_report_path: Path | None = None
+
+        self._query_input = QPlainTextEdit()
+        self._search_btn = QPushButton("Найти по смыслу")
+        self._open_btn = QPushButton("Открыть файл")
+        self._status = QLabel("")
+        self._history = QListWidget()
+        self._reports = QListWidget()
+        self._preview = QPlainTextEdit()
+        self._log = QPlainTextEdit()
+
+        self._build_ui()
+        self._refresh_lists()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        title = QLabel("Trace / semantic search")
+        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+        hint = QLabel("Поиск выполняется по смыслу описания идеи, а не по буквальному вхождению слов.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #1F4E79;")
+
+        self._query_input.setPlaceholderText("Опишите идею, гипотезу или понятие своими словами...")
+        self._preview.setReadOnly(True)
+        self._log.setReadOnly(True)
+        self._open_btn.setEnabled(False)
+
+        controls = QHBoxLayout()
+        controls.addWidget(self._search_btn)
+        controls.addWidget(self._open_btn)
+        controls.addStretch(1)
+
+        lists = QHBoxLayout()
+        left = QVBoxLayout()
+        left.addWidget(QLabel("История запросов"))
+        left.addWidget(self._history, 1)
+        left.addWidget(QLabel("Найденные trace-отчёты"))
+        left.addWidget(self._reports, 1)
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("Предпросмотр последнего результата"))
+        right.addWidget(self._preview, 1)
+        right.addWidget(QLabel("Лог запуска"))
+        right.addWidget(self._log, 1)
+
+        lists.addLayout(left, 1)
+        lists.addLayout(right, 2)
+
+        self._search_btn.clicked.connect(self._start_search)
+        self._open_btn.clicked.connect(self._open_report)
+        self._history.itemClicked.connect(lambda item: self._query_input.setPlainText(item.text()))
+        self._reports.itemClicked.connect(self._preview_selected_report)
+
+        layout.addWidget(title)
+        layout.addWidget(hint)
+        layout.addWidget(self._query_input)
+        layout.addLayout(controls)
+        layout.addWidget(self._status)
+        layout.addLayout(lists, 1)
+
+    def _start_search(self) -> None:
+        query = self._query_input.toPlainText().strip()
+        if not query:
+            QMessageBox.warning(self, "Пустой запрос", "Введите описание идеи или понятия.")
+            return
+        if not self._service.script_exists():
+            QMessageBox.warning(self, "Скрипт не найден", "Скрипт semantic_trace.py не найден. Проверьте путь scripts_path/repo_root.")
+            return
+
+        self._log.clear()
+        self._status.setText("Выполняется semantic trace...")
+        self._search_btn.setEnabled(False)
+        self._worker = _TraceWorker(self._service, query)
+        self._worker.output_line.connect(self._log.appendPlainText)
+        self._worker.finished_with_result.connect(self._on_search_finished)
+        self._worker.start()
+
+    def _on_search_finished(self, result: TraceRunResult) -> None:
+        self._search_btn.setEnabled(True)
+        if result.return_code != 0:
+            message = result.error_message or "semantic_trace.py завершился с ошибкой."
+            self._status.setText(message)
+            QMessageBox.warning(self, "Ошибка semantic trace", message)
+            return
+
+        self._last_report_path = result.report_path
+        self._open_btn.setEnabled(self._last_report_path is not None and self._last_report_path.exists())
+        path_text = str(self._last_report_path) if self._last_report_path else "(файл не найден)"
+        self._status.setText(f"Готово. Создан trace-файл: {path_text}")
+        self._refresh_lists()
+        if self._last_report_path and self._last_report_path.exists():
+            self._preview.setPlainText(self._last_report_path.read_text(encoding='utf-8', errors='ignore'))
+
+    def _refresh_lists(self) -> None:
+        self._history.clear()
+        for query in self._service.recent_history():
+            QListWidgetItem(query, self._history)
+
+        self._reports.clear()
+        for report in self._service.list_trace_reports():
+            item = QListWidgetItem(report.name)
+            item.setData(Qt.ItemDataRole.UserRole, str(report))
+            self._reports.addItem(item)
+
+    def _preview_selected_report(self, item: QListWidgetItem) -> None:
+        path = Path(item.data(Qt.ItemDataRole.UserRole))
+        self._last_report_path = path
+        self._open_btn.setEnabled(path.exists())
+        if path.exists():
+            self._preview.setPlainText(path.read_text(encoding='utf-8', errors='ignore'))
+
+    def _open_report(self) -> None:
+        if self._last_report_path and self._last_report_path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_report_path)))
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[dict[str, str]]:
