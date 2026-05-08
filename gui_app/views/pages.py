@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui_app.services.script_runner import ScriptRunner, ScriptScenario, ScriptStep, build_rebuild_scenarios
+from gui_app.services.health_service import HealthData, HealthService
 from gui_app.services.state_inspector import InboxNoteState, KnowledgeBaseState, StateInspector
 from gui_app.services.trace_service import TraceRunResult, TraceService
 
@@ -654,6 +655,106 @@ class TracePage(QWidget):
         self._open_btn.setEnabled(path.exists())
         if path.exists():
             self._preview.setPlainText(path.read_text(encoding='utf-8', errors='ignore'))
+
+    def _open_report(self) -> None:
+        if self._last_report_path and self._last_report_path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_report_path)))
+
+
+class HealthPage(QWidget):
+    """Экран health-диагностики: запуск lint и просмотр отчёта."""
+
+    def __init__(self, repo_root: Path, scripts_path: Path) -> None:
+        super().__init__()
+        self._service = HealthService(repo_root=repo_root, scripts_path=scripts_path)
+        self._last_report_path: Path | None = None
+
+        self._run_btn = QPushButton("Запустить health check")
+        self._refresh_btn = QPushButton("Обновить из последнего отчёта")
+        self._open_btn = QPushButton("Открыть отчёт")
+        self._status = QLabel("")
+        self._report_path_label = QLabel("—")
+        self._categories = QTableWidget(0, 2)
+        self._viewer = QPlainTextEdit()
+
+        self._build_ui()
+        self._load_latest()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        title = QLabel("Health")
+        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+        hint = QLabel("Диагностика базы: запуск lint_knowledge_base.py и разбор категорий проблем.")
+        hint.setWordWrap(True)
+
+        self._categories.setHorizontalHeaderLabels(["Категория", "Кол-во"])
+        self._categories.horizontalHeader().setStretchLastSection(False)
+        self._categories.horizontalHeader().setSectionResizeMode(0, self._categories.horizontalHeader().ResizeMode.Stretch)
+        self._categories.horizontalHeader().setSectionResizeMode(1, self._categories.horizontalHeader().ResizeMode.ResizeToContents)
+        self._categories.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._categories.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._categories.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+
+        self._viewer.setReadOnly(True)
+        self._open_btn.setEnabled(False)
+
+        controls = QHBoxLayout()
+        controls.addWidget(self._run_btn)
+        controls.addWidget(self._refresh_btn)
+        controls.addWidget(self._open_btn)
+        controls.addStretch(1)
+
+        report_row = QHBoxLayout()
+        report_row.addWidget(QLabel("Последний отчёт:"))
+        report_row.addWidget(self._report_path_label, 1)
+
+        self._run_btn.clicked.connect(self._run_lint)
+        self._refresh_btn.clicked.connect(self._load_latest)
+        self._open_btn.clicked.connect(self._open_report)
+
+        layout.addWidget(title)
+        layout.addWidget(hint)
+        layout.addLayout(controls)
+        layout.addWidget(self._status)
+        layout.addLayout(report_row)
+        layout.addWidget(QLabel("Категории проблем"))
+        layout.addWidget(self._categories, 1)
+        layout.addWidget(QLabel("Текст отчёта"))
+        layout.addWidget(self._viewer, 2)
+
+    def _run_lint(self) -> None:
+        self._status.setText("Запуск lint_knowledge_base.py...")
+        result, health = self._service.run_lint()
+        if result.return_code != 0:
+            self._status.setText("Lint завершился с ошибкой. Ниже показан stdout/stderr.")
+            self._viewer.setPlainText((result.stdout + "\n" + result.stderr).strip())
+            self._fill_health(health)
+            return
+        self._status.setText("Health check завершён успешно.")
+        self._fill_health(health)
+
+    def _load_latest(self) -> None:
+        self._fill_health(self._service.load_latest_report())
+        if self._last_report_path:
+            self._status.setText("Загружен последний health report.")
+        else:
+            self._status.setText("Health report пока не найден.")
+
+    def _fill_health(self, health: HealthData) -> None:
+        self._last_report_path = health.report_path
+        self._open_btn.setEnabled(self._last_report_path is not None and self._last_report_path.exists())
+        self._report_path_label.setText(str(self._last_report_path) if self._last_report_path else "—")
+
+        self._categories.setRowCount(0)
+        for row_idx, category in enumerate(health.categories):
+            self._categories.insertRow(row_idx)
+            self._categories.setItem(row_idx, 0, QTableWidgetItem(category.title))
+            self._categories.setItem(row_idx, 1, QTableWidgetItem(str(category.count)))
+
+        if health.report_text:
+            self._viewer.setPlainText(health.report_text)
+        else:
+            self._viewer.setPlainText("Отчёт отсутствует. Нажмите «Запустить health check».")
 
     def _open_report(self) -> None:
         if self._last_report_path and self._last_report_path.exists():
