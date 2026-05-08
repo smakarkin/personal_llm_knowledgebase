@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui_app.config import AppConfig
-from gui_app.views.pages import PAGE_TITLES, DashboardPage, PipelineMapPage, create_placeholder_page
+from gui_app.views.pages import PAGE_TITLES, DashboardPage, PipelineMapPage, RebuildPage, create_placeholder_page
 
 
 class MainWindow(QMainWindow):
@@ -89,6 +89,14 @@ class MainWindow(QMainWindow):
                 self._stack.addWidget(
                     PipelineMapPage(
                         repo_root=self._config.vault_path,
+                        inbox_folder=self._config.inbox_folder,
+                    )
+                )
+            elif page_title == "Rebuild":
+                self._stack.addWidget(
+                    RebuildPage(
+                        repo_root=self._config.vault_path,
+                        scripts_path=self._config.scripts_path,
                         inbox_folder=self._config.inbox_folder,
                     )
                 )
