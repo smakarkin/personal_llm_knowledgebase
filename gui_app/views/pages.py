@@ -36,10 +36,12 @@ class DashboardPage(QWidget):
     def __init__(self, repo_root: Path, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
+        self._inbox_folder = inbox_folder
 
         self._header = QLabel("Dashboard")
         self._status_line = QLabel("")
         self._recommendation = QLabel("")
+        self._diagnostics = QLabel("")
 
         self._stat_labels: dict[str, QLabel] = {}
         self._time_labels: dict[str, QLabel] = {}
@@ -72,6 +74,7 @@ class DashboardPage(QWidget):
         cards_layout.addWidget(self._make_layers_card(), 0, 1)
         cards_layout.addWidget(self._make_timestamps_card(), 1, 0, 1, 2)
         cards_layout.addWidget(self._make_recommendation_card(), 2, 0, 1, 2)
+        cards_layout.addWidget(self._make_diagnostics_card(), 3, 0, 1, 2)
 
         layout.addLayout(top_row)
         layout.addWidget(self._status_line)
@@ -94,7 +97,7 @@ class DashboardPage(QWidget):
     def _make_counts_card(self) -> QWidget:
         card, body = self._make_card("Содержимое базы")
         for key, title in [
-            ("inbox_md", "Markdown в InBox"),
+            ("inbox_md", f"Markdown в {self._inbox_folder}"),
             ("zettelkasten_md", "Markdown в Zettelkasten"),
             ("missing_primary", "Без llm_primary_cluster"),
         ]:
@@ -129,6 +132,14 @@ class DashboardPage(QWidget):
         self._recommendation.setWordWrap(True)
         self._recommendation.setAlignment(Qt.AlignmentFlag.AlignTop)
         body.addWidget(self._recommendation)
+        return card
+
+    def _make_diagnostics_card(self) -> QWidget:
+        card, body = self._make_card("Диагностика")
+        self._diagnostics.setWordWrap(True)
+        self._diagnostics.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._diagnostics.setStyleSheet("color: #8A4B00;")
+        body.addWidget(self._diagnostics)
         return card
 
     def _labeled_value(self, label: str, bucket: dict[str, QLabel], key: str) -> QHBoxLayout:
@@ -167,6 +178,10 @@ class DashboardPage(QWidget):
         self._time_labels["indexes"].setText(_fmt_dt(state.indexes_last_modified))
 
         self._recommendation.setText(state.recommended_next_step)
+        if state.diagnostics:
+            self._diagnostics.setText("\n".join(f"• {item}" for item in state.diagnostics))
+        else:
+            self._diagnostics.setText("Проблемы пути/файлов не обнаружены.")
 
 
 def _fmt_dt(value: datetime | None) -> str:

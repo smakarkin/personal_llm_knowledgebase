@@ -22,6 +22,7 @@ class KnowledgeBaseState:
     concepts_last_modified: datetime | None
     indexes_last_modified: datetime | None
     recommended_next_step: str
+    diagnostics: list[str]
 
 
 class StateInspector:
@@ -32,8 +33,8 @@ class StateInspector:
         self.inbox_folder = inbox_folder
 
     def inspect(self) -> KnowledgeBaseState:
-        inbox = self.repo_root / self.inbox_folder
-        zettelkasten = self.repo_root / "Zettelkasten"
+        inbox, inbox_hint = _resolve_vault_dir(self.repo_root, self.inbox_folder)
+        zettelkasten, zettelkasten_hint = _resolve_vault_dir(self.repo_root, "Zettelkasten")
 
         inbox_markdowns = list(_iter_markdown_files(inbox))
         zettelkasten_markdowns = list(_iter_markdown_files(zettelkasten))
@@ -42,11 +43,11 @@ class StateInspector:
             1 for note_path in zettelkasten_markdowns if not _has_nonempty_frontmatter_key(note_path, "llm_primary_cluster")
         )
 
-        primary_dir = self.repo_root / "11_llm_collections_primary"
-        candidate_dir = self.repo_root / "11_llm_collections_candidate"
-        concepts_dir = self.repo_root / "12_llm_concepts"
-        indexes_dir = self.repo_root / "13_llm_indexes"
-        traces_dir = self.repo_root / "14_llm_traces"
+        primary_dir, primary_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_primary")
+        candidate_dir, candidate_hint = _resolve_vault_dir(self.repo_root, "11_llm_collections_candidate")
+        concepts_dir, concepts_hint = _resolve_vault_dir(self.repo_root, "12_llm_concepts")
+        indexes_dir, indexes_hint = _resolve_vault_dir(self.repo_root, "13_llm_indexes")
+        traces_dir, traces_hint = _resolve_vault_dir(self.repo_root, "14_llm_traces")
 
         primary_files = list(_iter_markdown_files(primary_dir))
         candidate_files = list(_iter_markdown_files(candidate_dir))
@@ -58,6 +59,22 @@ class StateInspector:
         candidate_last = _latest_mtime(candidate_files)
         concepts_last = _latest_mtime(concept_files)
         indexes_last = _latest_mtime(index_files)
+
+        diagnostics = self._collect_diagnostics(
+            inbox=inbox,
+            zettelkasten=zettelkasten,
+            primary_dir=primary_dir,
+            candidate_dir=candidate_dir,
+            concepts_dir=concepts_dir,
+            indexes_dir=indexes_dir,
+            traces_dir=traces_dir,
+            primary_files=primary_files,
+            candidate_files=candidate_files,
+            concept_files=concept_files,
+            index_files=index_files,
+            trace_files=trace_files,
+            hints=[inbox_hint, zettelkasten_hint, primary_hint, candidate_hint, concepts_hint, indexes_hint, traces_hint],
+        )
 
         recommendation = self._build_recommendation(
             inbox_markdowns=inbox_markdowns,
@@ -82,7 +99,43 @@ class StateInspector:
             concepts_last_modified=concepts_last,
             indexes_last_modified=indexes_last,
             recommended_next_step=recommendation,
+            diagnostics=diagnostics,
         )
+
+
+    def _collect_diagnostics(
+        self,
+        *,
+        inbox: Path,
+        zettelkasten: Path,
+        primary_dir: Path,
+        candidate_dir: Path,
+        concepts_dir: Path,
+        indexes_dir: Path,
+        traces_dir: Path,
+        primary_files: list[Path],
+        candidate_files: list[Path],
+        concept_files: list[Path],
+        index_files: list[Path],
+        trace_files: list[Path],
+        hints: list[str | None],
+    ) -> list[str]:
+        diagnostics: list[str] = []
+
+        for hint in hints:
+            if hint:
+                diagnostics.append(hint)
+
+        for folder in (inbox, zettelkasten, primary_dir, candidate_dir, concepts_dir, indexes_dir, traces_dir):
+            if not folder.exists():
+                diagnostics.append(f"Отсутствует папка: {folder}")
+
+        if any(path.exists() for path in (primary_dir, candidate_dir, concepts_dir, indexes_dir)) and not any(
+            (primary_files, candidate_files, concept_files, index_files)
+        ):
+            diagnostics.append("LLM-папки существуют, но markdown-файлы не найдены (проверьте расширения и путь к vault).")
+
+        return diagnostics
 
     def _build_recommendation(
         self,
@@ -115,7 +168,11 @@ class StateInspector:
 def _iter_markdown_files(folder: Path) -> list[Path]:
     if not folder.exists() or not folder.is_dir():
         return []
-    return [path for path in folder.rglob("*.md") if path.is_file()]
+    return [
+        path
+        for path in folder.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".md", ".markdown"}
+    ]
 
 
 def _iter_files(folder: Path) -> list[Path]:
@@ -150,3 +207,23 @@ def _has_nonempty_frontmatter_key(note_path: Path, key: str) -> bool:
             value = line.split(":", 1)[1].strip()
             return bool(value)
     return False
+
+
+def _resolve_vault_dir(repo_root: Path, configured_name: str) -> tuple[Path, str | None]:
+    exact = repo_root / configured_name
+    if exact.exists():
+        return exact, None
+
+    normalized_target = _normalize_folder_name(configured_name)
+    candidates = [p for p in repo_root.iterdir() if p.is_dir() and _normalize_folder_name(p.name) == normalized_target]
+    if candidates:
+        picked = sorted(candidates, key=lambda item: (item.name != configured_name, item.name))[0]
+        return picked, (
+            f"Папка '{configured_name}' не найдена, используется '{picked.name}' (правило нормализации имён)."
+        )
+
+    return exact, None
+
+
+def _normalize_folder_name(name: str) -> str:
+    return name.strip().lstrip("_").lower().replace("-", "_")
