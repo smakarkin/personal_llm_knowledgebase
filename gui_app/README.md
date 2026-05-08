@@ -35,12 +35,14 @@ python -m gui_app.main
 Поля:
 - `vault_path` — путь к Obsidian-хранилищу (где лежат InBox/Zettelkasten/LLM-слои).
 - `scripts_path` — путь к папке с backend-скриптами.
+- `inbox_folder` — имя папки входящих в vault (например, `__Inbox`).
 
 Пример:
 ```json
 {
   "vault_path": "../my_obsidian_vault",
-  "scripts_path": ".."
+  "scripts_path": "..",
+  "inbox_folder": "__Inbox"
 }
 ```
 

@@ -79,7 +79,12 @@ class MainWindow(QMainWindow):
 
         for page_title in PAGE_TITLES:
             if page_title == "Dashboard":
-                self._stack.addWidget(DashboardPage(repo_root=self._config.vault_path))
+                self._stack.addWidget(
+                    DashboardPage(
+                        repo_root=self._config.vault_path,
+                        inbox_folder=self._config.inbox_folder,
+                    )
+                )
             else:
                 self._stack.addWidget(create_placeholder_page(page_title))
 

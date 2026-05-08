@@ -13,6 +13,7 @@ class AppConfig:
 
     vault_path: Path
     scripts_path: Path
+    inbox_folder: str
 
 
 def load_app_config(config_path: Path | None = None) -> AppConfig:
@@ -26,17 +27,18 @@ def load_app_config(config_path: Path | None = None) -> AppConfig:
     selected = _select_config_path(config_path)
 
     if selected is None:
-        return AppConfig(vault_path=repo_root, scripts_path=repo_root)
+        return AppConfig(vault_path=repo_root, scripts_path=repo_root, inbox_folder="InBox")
 
     payload = json.loads(selected.read_text(encoding="utf-8"))
 
     vault_raw = payload.get("vault_path")
     scripts_raw = payload.get("scripts_path")
+    inbox_folder = payload.get("inbox_folder", "InBox")
 
     vault_path = _resolve_path(vault_raw, base_dir=selected.parent, fallback=repo_root)
     scripts_path = _resolve_path(scripts_raw, base_dir=selected.parent, fallback=repo_root)
 
-    return AppConfig(vault_path=vault_path, scripts_path=scripts_path)
+    return AppConfig(vault_path=vault_path, scripts_path=scripts_path, inbox_folder=str(inbox_folder))
 
 
 def _select_config_path(explicit: Path | None) -> Path | None:

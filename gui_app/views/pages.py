@@ -33,9 +33,9 @@ PAGE_TITLES = [
 class DashboardPage(QWidget):
     """Страница с мониторингом состояния knowledge layer."""
 
-    def __init__(self, repo_root: Path) -> None:
+    def __init__(self, repo_root: Path, inbox_folder: str = "InBox") -> None:
         super().__init__()
-        self._inspector = StateInspector(repo_root)
+        self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
 
         self._header = QLabel("Dashboard")
         self._status_line = QLabel("")

@@ -27,11 +27,12 @@ class KnowledgeBaseState:
 class StateInspector:
     """Считывает состояние репозитория только по файлам и frontmatter."""
 
-    def __init__(self, repo_root: Path) -> None:
+    def __init__(self, repo_root: Path, inbox_folder: str = "InBox") -> None:
         self.repo_root = repo_root
+        self.inbox_folder = inbox_folder
 
     def inspect(self) -> KnowledgeBaseState:
-        inbox = self.repo_root / "InBox"
+        inbox = self.repo_root / self.inbox_folder
         zettelkasten = self.repo_root / "Zettelkasten"
 
         inbox_markdowns = list(_iter_markdown_files(inbox))
