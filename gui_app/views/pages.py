@@ -6,16 +6,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
+    QProgressBar,
+    QPlainTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from gui_app.services.script_runner import ScriptRunner, ScriptScenario, build_rebuild_scenarios
 from gui_app.services.state_inspector import KnowledgeBaseState, StateInspector
 
 PAGE_TITLES = [
@@ -269,6 +275,135 @@ class PipelineMapPage(QWidget):
         row.addLayout(text_col, 1)
         row.addWidget(link_btn, 0, Qt.AlignmentFlag.AlignTop)
         return wrap
+
+
+class _ScenarioWorker(QThread):
+    step_started = Signal(int, int, str)
+    output_line = Signal(str)
+    finished_with_code = Signal(int)
+
+    def __init__(self, runner: ScriptRunner, scenario: ScriptScenario) -> None:
+        super().__init__()
+        self._runner = runner
+        self._scenario = scenario
+
+    def run(self) -> None:
+        results = self._runner.run_scenario(
+            self._scenario,
+            on_step_start=lambda current, total, step: self.step_started.emit(current, total, step.title),
+            on_output=lambda line: self.output_line.emit(line),
+        )
+        code = 0 if results and results[-1].return_code == 0 and len(results) == len(self._scenario.steps) else 1
+        self.finished_with_code.emit(code)
+
+
+class RebuildPage(QWidget):
+    """Экран оркестрации rebuild-сценариев поверх существующих скриптов."""
+
+    def __init__(self, repo_root: Path, scripts_path: Path, inbox_folder: str = "InBox") -> None:
+        super().__init__()
+        self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
+        self._scenarios = build_rebuild_scenarios(inbox_folder=inbox_folder, zettelkasten_folder="Zettelkasten")
+        self._scenario_by_key = {item.key: item for item in self._scenarios}
+        self._worker: _ScenarioWorker | None = None
+
+        self._scenario_combo = QComboBox()
+        self._description = QLabel("")
+        self._progress = QProgressBar()
+        self._status = QLabel("Сценарий не запущен")
+        self._log = QPlainTextEdit()
+        self._run_btn = QPushButton("Запустить сценарий")
+        self._clear_btn = QPushButton("Очистить лог")
+
+        self._build_ui()
+        self._on_scenario_changed(0)
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        title = QLabel("Rebuild")
+        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+
+        for scenario in self._scenarios:
+            self._scenario_combo.addItem(scenario.title, scenario.key)
+
+        self._scenario_combo.currentIndexChanged.connect(self._on_scenario_changed)
+        self._run_btn.clicked.connect(self._confirm_and_start)
+        self._clear_btn.clicked.connect(self._log.clear)
+
+        self._description.setWordWrap(True)
+        self._progress.setMinimum(0)
+        self._progress.setValue(0)
+        self._log.setReadOnly(True)
+
+        controls = QHBoxLayout()
+        controls.addWidget(self._scenario_combo, 1)
+        controls.addWidget(self._run_btn)
+        controls.addWidget(self._clear_btn)
+
+        layout.addWidget(title)
+        layout.addLayout(controls)
+        layout.addWidget(self._description)
+        layout.addWidget(self._progress)
+        layout.addWidget(self._status)
+        layout.addWidget(self._log, 1)
+
+    def _on_scenario_changed(self, index: int) -> None:
+        key = self._scenario_combo.itemData(index)
+        scenario = self._scenario_by_key.get(key)
+        if scenario is None:
+            return
+        lines = "\n".join(f"{i}. {step.title}" for i, step in enumerate(scenario.steps, start=1))
+        self._description.setText(f"{scenario.description}\n\nШаги:\n{lines}")
+        self._progress.setMaximum(len(scenario.steps))
+        self._progress.setValue(0)
+
+    def _confirm_and_start(self) -> None:
+        scenario = self._scenario_by_key[self._scenario_combo.currentData()]
+        answer = QMessageBox.question(
+            self,
+            "Подтверждение запуска",
+            f"Запустить сценарий '{scenario.title}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._start_scenario(scenario)
+
+    def _start_scenario(self, scenario: ScriptScenario) -> None:
+        self._run_btn.setEnabled(False)
+        self._scenario_combo.setEnabled(False)
+        self._progress.setMaximum(len(scenario.steps))
+        self._progress.setValue(0)
+        self._status.setText("Запуск...")
+        self._append_log(f"=== Старт сценария: {scenario.title} ===")
+
+        self._worker = _ScenarioWorker(self._runner, scenario)
+        self._worker.step_started.connect(self._on_step_started)
+        self._worker.output_line.connect(self._append_log)
+        self._worker.finished_with_code.connect(self._on_finished)
+        self._worker.start()
+
+    def _on_step_started(self, current: int, total: int, title: str) -> None:
+        self._progress.setValue(current - 1)
+        self._status.setText(f"Шаг {current}/{total}: {title}")
+        self._append_log(f"\n--- Шаг {current}/{total}: {title} ---")
+
+    def _on_finished(self, code: int) -> None:
+        self._progress.setValue(self._progress.maximum())
+        if code == 0:
+            self._status.setText("Сценарий завершён успешно")
+            self._append_log("=== Сценарий завершён успешно ===")
+        else:
+            self._status.setText("Сценарий завершился с ошибкой")
+            self._append_log("=== Сценарий завершился с ошибкой ===")
+        self._run_btn.setEnabled(True)
+        self._scenario_combo.setEnabled(True)
+
+    def _append_log(self, text: str) -> None:
+        self._log.appendPlainText(text)
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[dict[str, str]]:
