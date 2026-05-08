@@ -24,8 +24,9 @@ class ScriptResult:
 class ScriptRunner:
     """Обёртка для вызова python-скриптов базы знаний."""
 
-    def __init__(self, repo_root: Path) -> None:
+    def __init__(self, repo_root: Path, scripts_path: Path | None = None) -> None:
         self.repo_root = repo_root
+        self.scripts_path = scripts_path or repo_root
 
     def run_script(self, script_name: str, args: Iterable[str] | None = None) -> ScriptResult:
         args = list(args or [])
@@ -43,6 +44,8 @@ class ScriptRunner:
     def _resolve_script_path(self, script_name: str) -> Path:
         """Поддерживает оба варианта размещения: ./scripts/* и корень репозитория."""
         candidates = [
+            self.scripts_path / script_name,
+            self.scripts_path / "scripts" / script_name,
             self.repo_root / "scripts" / script_name,
             self.repo_root / script_name,
         ]
