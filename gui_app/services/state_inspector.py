@@ -22,6 +22,7 @@ class KnowledgeBaseState:
     concepts_last_modified: datetime | None
     indexes_last_modified: datetime | None
     recommended_next_step: str
+    diagnostics: list[str]
 
 
 class StateInspector:
@@ -59,6 +60,21 @@ class StateInspector:
         concepts_last = _latest_mtime(concept_files)
         indexes_last = _latest_mtime(index_files)
 
+        diagnostics = self._collect_diagnostics(
+            inbox=inbox,
+            zettelkasten=zettelkasten,
+            primary_dir=primary_dir,
+            candidate_dir=candidate_dir,
+            concepts_dir=concepts_dir,
+            indexes_dir=indexes_dir,
+            traces_dir=traces_dir,
+            primary_files=primary_files,
+            candidate_files=candidate_files,
+            concept_files=concept_files,
+            index_files=index_files,
+            trace_files=trace_files,
+        )
+
         recommendation = self._build_recommendation(
             inbox_markdowns=inbox_markdowns,
             zettelkasten_markdowns=zettelkasten_markdowns,
@@ -82,7 +98,38 @@ class StateInspector:
             concepts_last_modified=concepts_last,
             indexes_last_modified=indexes_last,
             recommended_next_step=recommendation,
+            diagnostics=diagnostics,
         )
+
+
+    def _collect_diagnostics(
+        self,
+        *,
+        inbox: Path,
+        zettelkasten: Path,
+        primary_dir: Path,
+        candidate_dir: Path,
+        concepts_dir: Path,
+        indexes_dir: Path,
+        traces_dir: Path,
+        primary_files: list[Path],
+        candidate_files: list[Path],
+        concept_files: list[Path],
+        index_files: list[Path],
+        trace_files: list[Path],
+    ) -> list[str]:
+        diagnostics: list[str] = []
+
+        for folder in (inbox, zettelkasten, primary_dir, candidate_dir, concepts_dir, indexes_dir, traces_dir):
+            if not folder.exists():
+                diagnostics.append(f"Отсутствует папка: {folder}")
+
+        if any(path.exists() for path in (primary_dir, candidate_dir, concepts_dir, indexes_dir)) and not any(
+            (primary_files, candidate_files, concept_files, index_files)
+        ):
+            diagnostics.append("LLM-папки существуют, но markdown-файлы не найдены (проверьте расширения и путь к vault).")
+
+        return diagnostics
 
     def _build_recommendation(
         self,
@@ -115,7 +162,11 @@ class StateInspector:
 def _iter_markdown_files(folder: Path) -> list[Path]:
     if not folder.exists() or not folder.is_dir():
         return []
-    return [path for path in folder.rglob("*.md") if path.is_file()]
+    return [
+        path
+        for path in folder.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".md", ".markdown"}
+    ]
 
 
 def _iter_files(folder: Path) -> list[Path]:
