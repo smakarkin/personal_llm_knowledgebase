@@ -1,5 +1,5 @@
 {
-  "vault_path": "..",
+  "vault_path": "../..",
   "scripts_path": "..",
-  "inbox_folder": "InBox"
+  "inbox_folder": "__Inbox"
 }
