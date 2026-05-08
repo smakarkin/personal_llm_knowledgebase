@@ -28,7 +28,10 @@ class ScriptRunner:
 
     def run_script(self, script_name: str, args: Iterable[str] | None = None) -> ScriptResult:
         args = list(args or [])
-        script_path = self._resolve_script_path(script_name)
+        try:
+            script_path = self._resolve_script_path(script_name)
+        except FileNotFoundError as exc:
+            return ScriptResult(return_code=1, stdout="", stderr=str(exc))
 
         process = subprocess.run(
             ["python", str(script_path), *args],
@@ -80,7 +83,13 @@ class ScriptRunner:
         on_output: Callable[[str], None] | None = None,
     ) -> ScriptResult:
         args = list(args or [])
-        script_path = self._resolve_script_path(script_name)
+        try:
+            script_path = self._resolve_script_path(script_name)
+        except FileNotFoundError as exc:
+            message = str(exc)
+            if on_output:
+                on_output(message)
+            return ScriptResult(return_code=1, stdout="", stderr=message)
         process = subprocess.Popen(
             ["python", str(script_path), *args],
             cwd=self.repo_root,
