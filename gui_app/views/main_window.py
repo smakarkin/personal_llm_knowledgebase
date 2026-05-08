@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui_app.config import AppConfig
-from gui_app.views.pages import PAGE_TITLES, DashboardPage, InBoxPage, PipelineMapPage, RebuildPage, create_placeholder_page
+from gui_app.views.pages import PAGE_TITLES, DashboardPage, InBoxPage, PipelineMapPage, RebuildPage, TracePage, create_placeholder_page
 
 
 class MainWindow(QMainWindow):
@@ -106,6 +106,13 @@ class MainWindow(QMainWindow):
                         repo_root=self._config.vault_path,
                         scripts_path=self._config.scripts_path,
                         inbox_folder=self._config.inbox_folder,
+                    )
+                )
+            elif page_title == "Trace":
+                self._stack.addWidget(
+                    TracePage(
+                        repo_root=self._config.vault_path,
+                        scripts_path=self._config.scripts_path,
                     )
                 )
             else:
