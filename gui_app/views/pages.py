@@ -27,10 +27,11 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from gui_app.services.script_runner import ScriptRunner, ScriptScenario, ScriptStep, build_rebuild_scenarios
+from gui_app.services.script_runner import ScriptRunner, build_rebuild_scenarios
 from gui_app.services.health_service import HealthData, HealthService
-from gui_app.services.state_inspector import InboxNoteState, KnowledgeBaseState, StateInspector
-from gui_app.services.trace_service import TraceRunResult, TraceService
+from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, PipelineStepStatus, RebuildScenario, RebuildStep, TraceRunResult
+from gui_app.services.state_inspector import StateInspector
+from gui_app.services.trace_service import TraceService
 
 PAGE_TITLES = [
     "Dashboard",
@@ -256,24 +257,24 @@ class PipelineMapPage(QWidget):
         for step in _build_pipeline_steps(state):
             self._list.addWidget(self._make_step_row(step))
 
-    def _make_step_row(self, step: dict[str, str]) -> QWidget:
+    def _make_step_row(self, step: PipelineStepStatus) -> QWidget:
         wrap = QFrame()
         wrap.setStyleSheet("QFrame { border: 1px solid #DDD; border-radius: 8px; }")
         row = QHBoxLayout(wrap)
         row.setContentsMargins(10, 8, 10, 8)
         row.setSpacing(8)
 
-        name = QLabel(step["title"])
+        name = QLabel(step.title)
         name.setStyleSheet("font-weight: 700;")
-        status_text, bg, fg = self._STATUS_STYLES[step["status"]]
+        status_text, bg, fg = self._STATUS_STYLES[step.status]
         status = QLabel(status_text)
         status.setStyleSheet(f"padding: 2px 8px; border-radius: 10px; background: {bg}; color: {fg};")
-        explanation = QLabel(step["explanation"])
+        explanation = QLabel(step.explanation)
         explanation.setWordWrap(True)
         explanation.setStyleSheet("color: #444;")
 
-        link_btn = QPushButton(step["link"])
-        link_btn.setEnabled(bool(step["link"]))
+        link_btn = QPushButton(step.link)
+        link_btn.setEnabled(bool(step.link))
 
         text_col = QVBoxLayout()
         text_col.addWidget(name)
@@ -290,7 +291,7 @@ class _ScenarioWorker(QThread):
     output_line = Signal(str)
     finished_with_code = Signal(int)
 
-    def __init__(self, runner: ScriptRunner, scenario: ScriptScenario) -> None:
+    def __init__(self, runner: ScriptRunner, scenario: RebuildScenario) -> None:
         super().__init__()
         self._runner = runner
         self._scenario = scenario
@@ -380,7 +381,7 @@ class RebuildPage(QWidget):
             return
         self._start_scenario(scenario)
 
-    def _start_scenario(self, scenario: ScriptScenario) -> None:
+    def _start_scenario(self, scenario: RebuildScenario) -> None:
         self._run_btn.setEnabled(False)
         self._scenario_combo.setEnabled(False)
         self._progress.setMaximum(len(scenario.steps))
@@ -486,7 +487,7 @@ class InBoxPage(QWidget):
         )
         self._fill_table(notes)
 
-    def _fill_table(self, notes: list[InboxNoteState]) -> None:
+    def _fill_table(self, notes: list[InboxNoteStatus]) -> None:
         self._table.setRowCount(len(notes))
         for row, note in enumerate(notes):
             self._table.setItem(row, 0, QTableWidgetItem(note.file_name))
@@ -500,11 +501,11 @@ class InBoxPage(QWidget):
         self._table.resizeColumnsToContents()
 
     def _run_classification(self) -> None:
-        scenario = ScriptScenario(
+        scenario = RebuildScenario(
             key="classify_inbox_only",
             title="Классификация InBox",
             description=f"Запуск propose_clusters.py для папки {self._inbox_folder}.",
-            steps=(ScriptStep("Классификация InBox", "propose_clusters.py", (self._inbox_folder,)),),
+            steps=(RebuildStep("Классификация InBox", "propose_clusters.py", (self._inbox_folder,)),),
         )
         self._classify_btn.setEnabled(False)
         self._status_line.setText("Запуск классификации InBox...")
@@ -761,80 +762,31 @@ class HealthPage(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_report_path)))
 
 
-def _build_pipeline_steps(state: KnowledgeBaseState) -> list[dict[str, str]]:
+def _build_pipeline_steps(state: KnowledgeBaseState) -> list[PipelineStepStatus]:
     collections_latest = _newest(state.collections_primary_last_modified, state.collections_candidate_last_modified)
     concepts_stale = _is_older(state.concepts_last_modified, collections_latest)
     indexes_stale = _is_older(state.indexes_last_modified, state.concepts_last_modified)
 
     return [
-        {
-            "title": "InBox ingest",
-            "status": "needs_attention" if state.inbox_markdown_count > 0 else "ok",
-            "explanation": (
-                f"Во входящих {state.inbox_markdown_count} заметок: нужен разбор."
-                if state.inbox_markdown_count > 0
-                else "Входящие пусты или уже разобраны."
-            ),
-            "link": "Перейти к InBox",
-        },
-        {
-            "title": "Classification",
-            "status": "needs_attention" if state.zettelkasten_missing_primary_cluster_count > 0 else "ok",
-            "explanation": (
-                f"Без llm_primary_cluster: {state.zettelkasten_missing_primary_cluster_count}."
-                if state.zettelkasten_missing_primary_cluster_count > 0
-                else "Ключевые llm-кластеры в заметках присутствуют."
-            ),
-            "link": "Перейти к Health",
-        },
-        {
-            "title": "Primary collections",
-            "status": "not_run" if state.collections_primary_count == 0 else "ok",
-            "explanation": f"Файлов primary collections: {state.collections_primary_count}.",
-            "link": "Перейти к Pipeline",
-        },
-        {
-            "title": "Candidate collections",
-            "status": "not_run" if state.collections_candidate_count == 0 else "ok",
-            "explanation": f"Файлов candidate collections: {state.collections_candidate_count}.",
-            "link": "Перейти к Pipeline",
-        },
-        {
-            "title": "Concepts",
-            "status": "not_run" if state.concepts_count == 0 else ("stale" if concepts_stale else "ok"),
-            "explanation": "Concepts отсутствуют." if state.concepts_count == 0 else (
-                "Concepts старее collections: рекомендуется пересборка." if concepts_stale else "Concepts актуальны относительно collections."
-            ),
-            "link": "Перейти к Pipeline",
-        },
-        {
-            "title": "Indexes",
-            "status": "not_run" if state.indexes_count == 0 else ("stale" if indexes_stale else "ok"),
-            "explanation": "Indexes отсутствуют." if state.indexes_count == 0 else (
-                "Indexes старее concepts: рекомендуется пересборка." if indexes_stale else "Indexes актуальны."
-            ),
-            "link": "Перейти к Pipeline",
-        },
-        {
-            "title": "Trace / semantic search",
-            "status": "not_run" if state.traces_count == 0 else "ok",
-            "explanation": f"Файлов trace-слоя: {state.traces_count}.",
-            "link": "Перейти к Trace",
-        },
-        {
-            "title": "Health check",
-            "status": "needs_attention" if state.diagnostics else "ok",
-            "explanation": "Найдены диагностические замечания." if state.diagnostics else "Проблемы путей и структуры не обнаружены.",
-            "link": "Перейти к Health",
-        },
-        {
-            "title": "Manual transfer to Zettelkasten",
-            "status": "needs_attention" if state.inbox_markdown_count > 0 else "ok",
-            "explanation": "Есть входящие, перенос в Zettelkasten ещё не завершён." if state.inbox_markdown_count > 0 else "Нет входящих для ручного переноса.",
-            "link": "Перейти к InBox",
-        },
+        PipelineStepStatus("InBox ingest", "needs_attention" if state.inbox_markdown_count > 0 else "ok",
+            f"Во входящих {state.inbox_markdown_count} заметок: нужен разбор." if state.inbox_markdown_count > 0 else "Входящие пусты или уже разобраны.",
+            "Перейти к InBox"),
+        PipelineStepStatus("Classification", "needs_attention" if state.zettelkasten_missing_primary_cluster_count > 0 else "ok",
+            f"Без llm_primary_cluster: {state.zettelkasten_missing_primary_cluster_count}." if state.zettelkasten_missing_primary_cluster_count > 0 else "Ключевые llm-кластеры в заметках присутствуют.",
+            "Перейти к Health"),
+        PipelineStepStatus("Primary collections", "not_run" if state.collections_primary_count == 0 else "ok", f"Файлов primary collections: {state.collections_primary_count}.", "Перейти к Pipeline"),
+        PipelineStepStatus("Candidate collections", "not_run" if state.collections_candidate_count == 0 else "ok", f"Файлов candidate collections: {state.collections_candidate_count}.", "Перейти к Pipeline"),
+        PipelineStepStatus("Concepts", "not_run" if state.concepts_count == 0 else ("stale" if concepts_stale else "ok"),
+            "Concepts отсутствуют." if state.concepts_count == 0 else ("Concepts старее collections: рекомендуется пересборка." if concepts_stale else "Concepts актуальны относительно collections."),
+            "Перейти к Pipeline"),
+        PipelineStepStatus("Indexes", "not_run" if state.indexes_count == 0 else ("stale" if indexes_stale else "ok"),
+            "Indexes отсутствуют." if state.indexes_count == 0 else ("Indexes старее concepts: рекомендуется пересборка." if indexes_stale else "Indexes актуальны."),
+            "Перейти к Pipeline"),
+        PipelineStepStatus("Trace / semantic search", "not_run" if state.traces_count == 0 else "ok", f"Файлов trace-слоя: {state.traces_count}.", "Перейти к Trace"),
+        PipelineStepStatus("Health check", "needs_attention" if state.diagnostics else "ok", "Найдены диагностические замечания." if state.diagnostics else "Проблемы путей и структуры не обнаружены.", "Перейти к Health"),
+        PipelineStepStatus("Manual transfer to Zettelkasten", "needs_attention" if state.inbox_markdown_count > 0 else "ok",
+            "Есть входящие, перенос в Zettelkasten ещё не завершён." if state.inbox_markdown_count > 0 else "Нет входящих для ручного переноса.", "Перейти к InBox"),
     ]
-
 
 def _is_older(target: datetime | None, baseline: datetime | None) -> bool:
     return bool(target and baseline and target < baseline)

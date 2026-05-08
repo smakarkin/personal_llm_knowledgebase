@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+DEFAULT_INBOX_FOLDER = "InBox"
+DEFAULT_ZETTELKASTEN_FOLDER = "Zettelkasten"
+LLM_COLLECTIONS_PRIMARY_DIR = "11_llm_collections_primary"
+LLM_COLLECTIONS_CANDIDATE_DIR = "11_llm_collections_candidate"
+LLM_CONCEPTS_DIR = "12_llm_concepts"
+LLM_INDEXES_DIR = "13_llm_indexes"
+LLM_TRACES_DIR = "14_llm_traces"
+
+
 @dataclass(frozen=True)
 class AppConfig:
     """Пути к vault Obsidian и каталогу backend-скриптов."""
@@ -27,13 +36,13 @@ def load_app_config(config_path: Path | None = None) -> AppConfig:
     selected = _select_config_path(config_path)
 
     if selected is None:
-        return AppConfig(vault_path=repo_root, scripts_path=repo_root, inbox_folder="InBox")
+        return AppConfig(vault_path=repo_root, scripts_path=repo_root, inbox_folder=DEFAULT_INBOX_FOLDER)
 
     payload = json.loads(selected.read_text(encoding="utf-8"))
 
     vault_raw = payload.get("vault_path")
     scripts_raw = payload.get("scripts_path")
-    inbox_folder = payload.get("inbox_folder", "InBox")
+    inbox_folder = payload.get("inbox_folder", DEFAULT_INBOX_FOLDER)
 
     vault_path = _resolve_path(vault_raw, base_dir=selected.parent, fallback=repo_root)
     scripts_path = _resolve_path(scripts_raw, base_dir=selected.parent, fallback=repo_root)

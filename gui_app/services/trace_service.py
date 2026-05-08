@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 from typing import Callable
 
+from gui_app.config import LLM_TRACES_DIR
+from gui_app.models.status_models import TraceRunResult
 from gui_app.services.script_runner import ScriptRunner
-
-
-@dataclass
-class TraceRunResult:
-    return_code: int
-    stdout: str
-    report_path: Path | None
-    error_message: str | None = None
 
 
 class TraceService:
@@ -43,7 +36,7 @@ class TraceService:
         return list(self._history)
 
     def list_trace_reports(self, limit: int = 50) -> list[Path]:
-        traces_dir = self._repo_root / "14_llm_traces"
+        traces_dir = self._repo_root / LLM_TRACES_DIR
         if not traces_dir.exists():
             return []
         files = sorted(traces_dir.glob("Trace - *.md"), key=lambda p: p.stat().st_mtime, reverse=True)
