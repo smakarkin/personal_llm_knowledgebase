@@ -17,14 +17,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui_app.config import AppConfig
 from gui_app.views.pages import PAGE_TITLES, DashboardPage, create_placeholder_page
 
 
 class MainWindow(QMainWindow):
     """Базовый каркас MVP-приложения."""
 
-    def __init__(self) -> None:
+    def __init__(self, config: AppConfig) -> None:
         super().__init__()
+        self._config = config
         self.setWindowTitle("Управление базой знаний Obsidian")
         self.resize(1200, 760)
 
@@ -77,7 +79,7 @@ class MainWindow(QMainWindow):
 
         for page_title in PAGE_TITLES:
             if page_title == "Dashboard":
-                self._stack.addWidget(DashboardPage(repo_root=Path(__file__).resolve().parents[2]))
+                self._stack.addWidget(DashboardPage(repo_root=self._config.vault_path))
             else:
                 self._stack.addWidget(create_placeholder_page(page_title))
 

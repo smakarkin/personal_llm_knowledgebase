@@ -6,6 +6,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
+from gui_app.config import load_app_config
 from gui_app.views.main_window import MainWindow
 
 
@@ -14,7 +15,8 @@ def run() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Knowledge Base GUI")
 
-    window = MainWindow()
+    config = load_app_config()
+    window = MainWindow(config=config)
     window.show()
 
     return app.exec()
