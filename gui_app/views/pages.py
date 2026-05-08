@@ -146,6 +146,9 @@ class DashboardPage(QWidget):
         card, body = self._make_card("Рекомендуемый следующий шаг")
         self._recommendation.setWordWrap(True)
         self._recommendation.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._recommendation.setStyleSheet(
+            "background:#EEF6FF; border:1px solid #93C5FD; border-radius:8px; padding:10px; font-weight:600;"
+        )
         body.addWidget(self._recommendation)
         return card
 
@@ -371,10 +374,11 @@ class RebuildPage(QWidget):
 
     def _confirm_and_start(self) -> None:
         scenario = self._scenario_by_key[self._scenario_combo.currentData()]
+        risk_hint = "Это может занять несколько минут и перезаписать generated LLM-слои."
         answer = QMessageBox.question(
             self,
             "Подтверждение запуска",
-            f"Запустить сценарий '{scenario.title}'?",
+            f"Запустить сценарий '{scenario.title}'?\n\n{risk_hint}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
@@ -498,6 +502,11 @@ class InBoxPage(QWidget):
             self._table.setItem(
                 row, 5, QTableWidgetItem("Готово к переносу" if note.is_ready_for_transfer else "Ещё требует обработки")
             )
+            status_item = self._table.item(row, 5)
+            if note.is_ready_for_transfer:
+                status_item.setBackground(Qt.GlobalColor.green)
+            else:
+                status_item.setBackground(Qt.GlobalColor.yellow)
         self._table.resizeColumnsToContents()
 
     def _run_classification(self) -> None:
@@ -570,7 +579,10 @@ class TracePage(QWidget):
 
         self._query_input.setPlaceholderText("Опишите идею, гипотезу или понятие своими словами...")
         self._preview.setReadOnly(True)
+        self._preview.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self._preview.setPlaceholderText("Выберите отчёт слева или запустите trace для предпросмотра результата.")
         self._log.setReadOnly(True)
+        self._log.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._open_btn.setEnabled(False)
 
         controls = QHBoxLayout()
@@ -697,6 +709,8 @@ class HealthPage(QWidget):
         self._categories.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
 
         self._viewer.setReadOnly(True)
+        self._viewer.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self._viewer.setPlaceholderText("Здесь появится текст health-отчёта.")
         self._open_btn.setEnabled(False)
 
         controls = QHBoxLayout()
@@ -725,7 +739,12 @@ class HealthPage(QWidget):
 
     def _run_lint(self) -> None:
         self._status.setText("Запуск lint_knowledge_base.py...")
-        result, health = self._service.run_lint()
+        try:
+            result, health = self._service.run_lint()
+        except FileNotFoundError as exc:
+            self._status.setText("Скрипт lint_knowledge_base.py не найден.")
+            self._viewer.setPlainText(str(exc))
+            return
         if result.return_code != 0:
             self._status.setText("Lint завершился с ошибкой. Ниже показан stdout/stderr.")
             self._viewer.setPlainText((result.stdout + "\n" + result.stderr).strip())

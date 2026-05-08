@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -12,10 +13,12 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QStatusBar,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtCore import QUrl
 
 from gui_app.config import AppConfig
 from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, TracePage, create_placeholder_page
@@ -32,8 +35,12 @@ class MainWindow(QMainWindow):
 
         self._menu = QListWidget()
         self._stack = QStackedWidget()
+        self._status_bar = QStatusBar()
         self._build_ui()
         self._bind_events()
+        self._build_menu_bar()
+        self._apply_global_styles()
+        self.statusBar().showMessage("Готово")
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -127,6 +134,37 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._stack)
         return panel
+
+    def _build_menu_bar(self) -> None:
+        file_menu = self.menuBar().addMenu("Файл")
+        open_vault = QAction("Открыть vault root", self)
+        open_vault.triggered.connect(self._open_vault_root)
+        file_menu.addAction(open_vault)
+        self.setStatusBar(self._status_bar)
+
+    def _open_vault_root(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._config.vault_path)))
+        self.statusBar().showMessage(f"Открыт vault root: {self._config.vault_path}", 4000)
+
+    def _apply_global_styles(self) -> None:
+        self.setStyleSheet(
+            """
+            QPushButton {
+                background: #2563EB;
+                color: white;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-weight: 600;
+            }
+            QPushButton:disabled {
+                background: #9CA3AF;
+                color: #F3F4F6;
+            }
+            QLabel[status="ok"] { color: #166534; }
+            QLabel[status="warn"] { color: #92400E; }
+            QLabel[status="error"] { color: #991B1B; }
+            """
+        )
 
     def _bind_events(self) -> None:
         self._menu.currentRowChanged.connect(self._stack.setCurrentIndex)
