@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -15,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui_app.views.pages import PAGE_TITLES, create_placeholder_page
+from gui_app.views.pages import PAGE_TITLES, DashboardPage, create_placeholder_page
 
 
 class MainWindow(QMainWindow):
@@ -74,7 +76,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
 
         for page_title in PAGE_TITLES:
-            self._stack.addWidget(create_placeholder_page(page_title))
+            if page_title == "Dashboard":
+                self._stack.addWidget(DashboardPage(repo_root=Path(__file__).resolve().parents[2]))
+            else:
+                self._stack.addWidget(create_placeholder_page(page_title))
 
         layout.addWidget(self._stack)
         return panel
