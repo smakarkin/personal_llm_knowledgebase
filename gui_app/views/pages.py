@@ -315,7 +315,7 @@ class _ScenarioWorker(QThread):
 class RebuildPage(QWidget):
     """Экран оркестрации rebuild-сценариев поверх существующих скриптов."""
 
-    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService, inbox_folder: str = "InBox") -> None:
+    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService | None = None, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
@@ -324,7 +324,7 @@ class RebuildPage(QWidget):
         self._scenarios = [self._planner.build_minimal_plan(state), self._planner.build_safe_plan(state), self._planner.build_full_plan(state)]
         self._scenario_by_key = {item.key: item for item in self._scenarios}
         self._worker: _ScenarioWorker | None = None
-        self._obsidian = obsidian_service
+        self._obsidian = obsidian_service or ObsidianService(repo_root)
 
         self._scenario_combo = QComboBox()
         self._description = QLabel("")
@@ -429,14 +429,14 @@ class RebuildPage(QWidget):
 class InBoxPage(QWidget):
     """Экран мониторинга InBox без автоматического переноса заметок."""
 
-    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService, inbox_folder: str = "InBox") -> None:
+    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService | None = None, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._repo_root = repo_root
         self._inbox_folder = inbox_folder
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
         self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
         self._worker: _ScenarioWorker | None = None
-        self._obsidian = obsidian_service
+        self._obsidian = obsidian_service or ObsidianService(repo_root)
 
         self._stats = QLabel("")
         self._status_line = QLabel("")
