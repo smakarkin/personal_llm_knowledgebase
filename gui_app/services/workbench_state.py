@@ -25,6 +25,9 @@ class WorkbenchState:
     ui_sections_expanded: dict[str, bool] = field(default_factory=dict)
     last_viewed_artifact_per_section: dict[str, str] = field(default_factory=dict)
     review_item_status: dict[str, str] = field(default_factory=dict)
+    workflow_sessions: dict[str, dict] = field(default_factory=dict)
+    dismissed_queues: list[str] = field(default_factory=list)
+    review_decisions: dict[str, list[dict]] = field(default_factory=dict)
 
 
 class WorkbenchStateStore:
