@@ -435,6 +435,9 @@ class _ScenarioWorker(QThread):
         code = 0 if results and results[-1].return_code == 0 and len(results) == len(self._scenario.steps) else 1
         self.finished_with_code.emit(code)
 
+    def stop(self) -> None:
+        self._runner.cancel_current()
+
 
 class RebuildPage(QWidget):
     """Экран оркестрации rebuild-сценариев поверх существующих скриптов."""
@@ -553,6 +556,12 @@ class RebuildPage(QWidget):
     def _append_log(self, text: str) -> None:
         self._log_widget.append(text)
 
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if self._worker and self._worker.isRunning():
+            self._worker.stop()
+            self._worker.wait(2000)
+        super().closeEvent(event)
+
 
 class InBoxPage(QWidget):
     """Экран мониторинга InBox без автоматического переноса заметок."""
@@ -638,7 +647,7 @@ class InBoxPage(QWidget):
             f"Всего заметок: {len(notes)} | Готово к переносу: {ready} | Требуют внимания: {needs_attention}"
         )
         self._status_line.setText(
-            f"Критерий готовности: не пустая, без llm_skip_reason, есть осмысленная llm-разметка."
+            "Критерий готовности: не пустая, llm_processed=true, заполнены topic/type/cluster, без llm_skip_reason."
         )
         self._fill_table(notes)
         self._refresh_handoff_list()
@@ -718,6 +727,12 @@ class InBoxPage(QWidget):
         for item in self._obsidian.handoff_queue:
             QListWidgetItem(f"{item.title} [{item.status}]", self._handoff_list)
 
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if self._worker and self._worker.isRunning():
+            self._worker.stop()
+            self._worker.wait(2000)
+        super().closeEvent(event)
+
 
 
 
@@ -733,6 +748,9 @@ class _TraceWorker(QThread):
     def run(self) -> None:
         result = self._service.run_trace(self._query, on_output=lambda line: self.output_line.emit(line))
         self.finished_with_result.emit(result)
+
+    def stop(self) -> None:
+        self._service._runner.cancel_current()
 
 
 class TracePage(QWidget):
@@ -830,6 +848,12 @@ class TracePage(QWidget):
 
     def _open_report(self) -> None:
         if self._last_report_path and self._last_report_path.exists(): ObsidianService(self._service.repo_root).open_file(self._last_report_path)
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if self._worker and self._worker.isRunning():
+            self._worker.stop()
+            self._worker.wait(2000)
+        super().closeEvent(event)
 
 
 class HealthPage(QWidget):
