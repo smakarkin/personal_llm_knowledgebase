@@ -608,129 +608,92 @@ class _TraceWorker(QThread):
 
 
 class TracePage(QWidget):
-    """Экран semantic trace-поиска по описанию идеи."""
+    """Экран trace workflow V2: быстрый и углублённый режимы + promotion."""
 
     def __init__(self, repo_root: Path, scripts_path: Path) -> None:
         super().__init__()
         self._service = TraceService(repo_root=repo_root, scripts_path=scripts_path)
+        from gui_app.services.concept_promotion_service import ConceptPromotionService
+        self._promotion = ConceptPromotionService(repo_root=repo_root)
         self._worker: _TraceWorker | None = None
         self._last_report_path: Path | None = None
 
+        self._mode = QComboBox(); self._mode.addItems(["Быстрый trace", "Углублённый trace"])
         self._query_input = QPlainTextEdit()
-        self._search_btn = QPushButton("Найти по смыслу")
+        self._search_btn = QPushButton("Запустить trace")
         self._open_btn = QPushButton("Открыть файл")
         self._status = QLabel("")
-        self._history = QListWidget()
-        self._reports = QListWidget()
-        self._preview = QPlainTextEdit()
-        self._log = QPlainTextEdit()
+        self._history = QListWidget(); self._reports = QListWidget(); self._shortlist = QListWidget()
+        self._preview = QPlainTextEdit(); self._log = QPlainTextEdit(); self._filters = QComboBox()
+        self._filters.addItems(["Все", "Новые", "Candidate", "Не promoted"])
+        self._curate_btn = QPushButton("Сохранить curated report")
+        self._promote_btn = QPushButton("Создать concept draft")
 
-        self._build_ui()
-        self._refresh_lists()
+        self._build_ui(); self._refresh_lists()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        title = QLabel("Trace / semantic search")
-        title.setStyleSheet("font-size: 22px; font-weight: 700;")
-        hint = QLabel("Поиск выполняется по смыслу описания идеи, а не по буквальному вхождению слов.")
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: #1F4E79;")
-
-        self._query_input.setPlaceholderText("Опишите идею, гипотезу или понятие своими словами...")
-        self._preview.setReadOnly(True)
-        self._preview.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self._preview.setPlaceholderText("Выберите отчёт слева или запустите trace для предпросмотра результата.")
-        self._log.setReadOnly(True)
-        self._log.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self._open_btn.setEnabled(False)
-
-        controls = QHBoxLayout()
-        controls.addWidget(self._search_btn)
-        controls.addWidget(self._open_btn)
-        controls.addStretch(1)
-
-        lists = QHBoxLayout()
-        left = QVBoxLayout()
-        left.addWidget(QLabel("История запросов"))
-        left.addWidget(self._history, 1)
-        left.addWidget(QLabel("Найденные trace-отчёты"))
-        left.addWidget(self._reports, 1)
-
-        right = QVBoxLayout()
-        right.addWidget(QLabel("Предпросмотр последнего результата"))
-        right.addWidget(self._preview, 1)
-        right.addWidget(QLabel("Лог запуска"))
-        right.addWidget(self._log, 1)
-
-        lists.addLayout(left, 1)
-        lists.addLayout(right, 2)
-
-        self._search_btn.clicked.connect(self._start_search)
-        self._open_btn.clicked.connect(self._open_report)
-        self._history.itemClicked.connect(lambda item: self._query_input.setPlainText(item.text()))
+        layout.addWidget(QLabel("Trace / explainability workflow"))
+        self._query_input.setPlaceholderText("Идея -> найденные collections/concepts -> source notes -> concept draft")
+        self._preview.setReadOnly(True); self._log.setReadOnly(True)
+        top=QHBoxLayout(); top.addWidget(QLabel("Режим:")); top.addWidget(self._mode); top.addWidget(QLabel("Фильтр:")); top.addWidget(self._filters); top.addStretch(1)
+        controls=QHBoxLayout(); controls.addWidget(self._search_btn); controls.addWidget(self._open_btn); controls.addWidget(self._curate_btn); controls.addWidget(self._promote_btn); controls.addStretch(1)
+        lists=QHBoxLayout(); l=QVBoxLayout(); l.addWidget(QLabel("История")); l.addWidget(self._history,1); l.addWidget(QLabel("Trace reports")); l.addWidget(self._reports,1); l.addWidget(QLabel("Shortlist источников")); l.addWidget(self._shortlist,1)
+        r=QVBoxLayout(); r.addWidget(QLabel("Explainability preview")); r.addWidget(self._preview,2); r.addWidget(QLabel("Лог")); r.addWidget(self._log,1)
+        lists.addLayout(l,1); lists.addLayout(r,2)
+        self._search_btn.clicked.connect(self._start_search); self._open_btn.clicked.connect(self._open_report)
+        self._history.itemClicked.connect(lambda it: self._query_input.setPlainText(it.text()))
         self._reports.itemClicked.connect(self._preview_selected_report)
-
-        layout.addWidget(title)
-        layout.addWidget(hint)
-        layout.addWidget(self._query_input)
-        layout.addLayout(controls)
-        layout.addWidget(self._status)
-        layout.addLayout(lists, 1)
+        self._curate_btn.clicked.connect(self._save_curated); self._promote_btn.clicked.connect(self._promote_concept)
+        self._filters.currentTextChanged.connect(lambda _: self._refresh_lists())
+        layout.addLayout(top); layout.addWidget(self._query_input); layout.addLayout(controls); layout.addWidget(self._status); layout.addLayout(lists,1)
 
     def _start_search(self) -> None:
-        query = self._query_input.toPlainText().strip()
-        if not query:
-            QMessageBox.warning(self, "Пустой запрос", "Введите описание идеи или понятия.")
-            return
-        if not self._service.script_exists():
-            QMessageBox.warning(self, "Скрипт не найден", "Скрипт semantic_trace.py не найден. Проверьте путь scripts_path/repo_root.")
-            return
-
-        self._log.clear()
-        self._status.setText("Выполняется semantic trace...")
-        self._search_btn.setEnabled(False)
-        self._worker = _TraceWorker(self._service, query)
-        self._worker.output_line.connect(self._log.appendPlainText)
-        self._worker.finished_with_result.connect(self._on_search_finished)
-        self._worker.start()
+        query=self._query_input.toPlainText().strip()
+        if not query: QMessageBox.warning(self,"Пустой запрос","Введите описание идеи или понятия."); return
+        self._log.clear(); self._status.setText("Выполняется semantic trace..."); self._search_btn.setEnabled(False)
+        self._worker=_TraceWorker(self._service,query); self._worker.output_line.connect(self._log.appendPlainText); self._worker.finished_with_result.connect(self._on_search_finished); self._worker.start()
 
     def _on_search_finished(self, result: TraceRunResult) -> None:
         self._search_btn.setEnabled(True)
-        if result.return_code != 0:
-            message = result.error_message or "semantic_trace.py завершился с ошибкой."
-            self._status.setText(message)
-            QMessageBox.warning(self, "Ошибка semantic trace", message)
-            return
-
-        self._last_report_path = result.report_path
-        self._open_btn.setEnabled(self._last_report_path is not None and self._last_report_path.exists())
-        path_text = str(self._last_report_path) if self._last_report_path else "(файл не найден)"
-        self._status.setText(f"Готово. Создан trace-файл: {path_text}")
-        self._refresh_lists()
-        if self._last_report_path and self._last_report_path.exists():
-            self._preview.setPlainText(self._last_report_path.read_text(encoding='utf-8', errors='ignore'))
+        if result.return_code!=0: QMessageBox.warning(self,"Ошибка",result.error_message or "Ошибка semantic trace"); return
+        self._last_report_path=result.report_path; self._status.setText(f"Готово: {self._last_report_path}"); self._refresh_lists()
+        if self._last_report_path and self._last_report_path.exists(): self._load_report(self._last_report_path)
 
     def _refresh_lists(self) -> None:
-        self._history.clear()
-        for query in self._service.recent_history():
-            QListWidgetItem(query, self._history)
-
-        self._reports.clear()
-        for report in self._service.list_trace_reports():
-            item = QListWidgetItem(report.name)
-            item.setData(Qt.ItemDataRole.UserRole, str(report))
-            self._reports.addItem(item)
+        self._history.clear(); [QListWidgetItem(q,self._history) for q in self._service.recent_history()]
+        self._reports.clear(); mode=self._filters.currentText()
+        for meta in self._service.list_trace_report_meta():
+            if mode=="Новые" and meta.status not in {"draft","new"}: continue
+            if mode=="Candidate" and not meta.candidate_for_concept: continue
+            if mode=="Не promoted" and meta.promoted_to_concept: continue
+            item=QListWidgetItem(f"{meta.path.name} | status={meta.status} | sources={meta.source_items_count}")
+            item.setData(Qt.ItemDataRole.UserRole,str(meta.path)); self._reports.addItem(item)
 
     def _preview_selected_report(self, item: QListWidgetItem) -> None:
-        path = Path(item.data(Qt.ItemDataRole.UserRole))
-        self._last_report_path = path
-        self._open_btn.setEnabled(path.exists())
-        if path.exists():
-            self._preview.setPlainText(path.read_text(encoding='utf-8', errors='ignore'))
+        path=Path(item.data(Qt.ItemDataRole.UserRole)); self._last_report_path=path; self._load_report(path)
+
+    def _load_report(self, path: Path) -> None:
+        parsed=self._service.parse_trace_report(path); body=parsed['body']
+        self._preview.setPlainText(body)
+        links=parsed['links']; self._shortlist.clear(); [QListWidgetItem(l,self._shortlist) for l in links]
+
+    def _save_curated(self) -> None:
+        if not self._last_report_path: return
+        shortlist=[self._shortlist.item(i).text() for i in range(self._shortlist.count())]
+        out=self._service.save_curated_trace_report(self._last_report_path, shortlist)
+        self._status.setText(f"Сохранён curated report: {out.name}")
+        self._refresh_lists()
+
+    def _promote_concept(self) -> None:
+        if not self._last_report_path: return
+        shortlist=[self._shortlist.item(i).text() for i in range(self._shortlist.count())]
+        name=(self._query_input.toPlainText().strip() or "Candidate Concept")[:80]
+        concept=self._promotion.create_concept_draft(self._last_report_path, name, shortlist)
+        self._status.setText(f"Создан concept draft: {concept.name}")
 
     def _open_report(self) -> None:
-        if self._last_report_path and self._last_report_path.exists():
-            ObsidianService(self._service.repo_root).open_file(self._last_report_path)
+        if self._last_report_path and self._last_report_path.exists(): ObsidianService(self._service.repo_root).open_file(self._last_report_path)
 
 
 class HealthPage(QWidget):
