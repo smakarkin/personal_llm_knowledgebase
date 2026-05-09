@@ -46,6 +46,7 @@ from gui_app.services.suggestion_service import SuggestionService
 
 PAGE_TITLES = [
     "Dashboard",
+    "Workstation V4",
     "Pipeline Map",
     "InBox",
     "Rebuild",
@@ -53,7 +54,6 @@ PAGE_TITLES = [
     "Search",
     "Sources",
     "Health",
-    "Logs",
     "Settings",
 ]
 
@@ -274,7 +274,7 @@ class DashboardPage(QWidget):
         self._queue_meta.setText(f"Почему: {q.why_exists}\nРекомендация: {q.recommended_action}")
         self._review_list.clear()
         for item in q.open_items:
-            status = ws.review_item_status.get(item.item_id, ReviewStatus.open.value)
+            status = ws.review_item_status.get(item.item_id, ReviewStatus.new.value)
             QListWidgetItem(f"{item.title} [{status}] — {item.reason}", self._review_list)
 
     def _mark_reviewed_from_click(self, item: QListWidgetItem) -> None:
@@ -287,7 +287,7 @@ class DashboardPage(QWidget):
             return
         ws = self._state_store.load()
         review_item = q.open_items[idx]
-        ws.review_item_status[review_item.item_id] = ReviewStatus.reviewed.value
+        ws.review_item_status[review_item.item_id] = ReviewStatus.accepted.value
         ws.last_viewed_artifact_per_section["dashboard_review"] = review_item.title
         self._state_store.save(ws)
         self._on_queue_changed(row)

@@ -23,6 +23,7 @@ from gui_app.config import AppConfig, save_app_config
 from gui_app.services.workbench_state import WorkbenchStateStore
 from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, SearchPage, SettingsPage, TracePage, create_placeholder_page
 from gui_app.views.review_page import ReviewPage
+from gui_app.views.workstation_page import WorkstationPage
 from gui_app.services.obsidian_service import ObsidianService
 
 
@@ -101,6 +102,13 @@ class MainWindow(QMainWindow):
             elif page_title == "Pipeline Map":
                 self._stack.addWidget(
                     PipelineMapPage(
+                        repo_root=self._config.vault_path,
+                        inbox_folder=self._config.inbox_folder,
+                    )
+                )
+            elif page_title == "Workstation V4":
+                self._stack.addWidget(
+                    WorkstationPage(
                         repo_root=self._config.vault_path,
                         inbox_folder=self._config.inbox_folder,
                     )

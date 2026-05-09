@@ -136,3 +136,12 @@ Dashboard теперь стартовая operational-страница:
    - stale `concepts_vs_collections` → перегенерируйте concepts;
    - stale `indexes_vs_concepts` → перегенерируйте index.
 3. Смотрите историю задач в `gui_app/gui_app_data/task_history.json` для причин ошибок.
+## GUI V4 — Knowledge Workstation
+V4 эволюционно расширяет V3 (без слома существующих экранов) и добавляет:
+- Guided workflows (morning/inbox/refresh/trace) с шагами, целью и пояснением why.
+- Workspace/session memory в JSON (`workbench_state.json`) для незавершённых сессий, dismiss/review памяти и recent focus.
+- Explainable action planning: 3–5 next actions по группам (urgent/high leverage/safe/exploratory) с benefit/why/prerequisites/effort/related layers.
+- Quick command palette (desktop-first quick access).
+- Review governance baseline состояния: `new/in_review/deferred/accepted/rejected/promoted/archived`.
+
+Новая страница: **Workstation V4** — единый слой полуавтономной оркестрации поверх уже существующих scripts и файловой структуры.
