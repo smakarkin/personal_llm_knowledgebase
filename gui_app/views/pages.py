@@ -36,6 +36,8 @@ from gui_app.services.state_inspector import StateInspector
 from gui_app.services.trace_service import TraceService
 from gui_app.services.scenario_planner import ScenarioPlanner
 from gui_app.services.obsidian_service import ObsidianService
+from gui_app.services.queue_service import QueueService
+from gui_app.models.queues import ReviewStatus
 from gui_app.widgets.progress_log_widget import ProgressLogWidget
 
 PAGE_TITLES = [
@@ -66,6 +68,9 @@ class DashboardPage(QWidget):
         self._diagnostics = QLabel("")
         self._health_summary = QLabel("Health: —")
         self._workbench = QLabel("")
+        self._queue_list = QListWidget()
+        self._queue_meta = QLabel("")
+        self._review_list = QListWidget()
 
         self._stat_labels: dict[str, QLabel] = {}
         self._time_labels: dict[str, QLabel] = {}
@@ -101,6 +106,7 @@ class DashboardPage(QWidget):
         cards_layout.addWidget(self._make_diagnostics_card(), 3, 0, 1, 2)
         cards_layout.addWidget(self._make_health_card(), 4, 0, 1, 2)
         cards_layout.addWidget(self._make_workbench_card(), 5, 0, 1, 2)
+        cards_layout.addWidget(self._make_queues_card(), 6, 0, 1, 2)
 
         layout.addLayout(top_row)
         layout.addWidget(self._status_line)
@@ -180,6 +186,16 @@ class DashboardPage(QWidget):
         self._workbench.setWordWrap(True)
         body.addWidget(self._workbench)
         return card
+    def _make_queues_card(self) -> QWidget:
+        card, body = self._make_card("Active queues / review workflow")
+        self._queue_list.currentRowChanged.connect(self._on_queue_changed)
+        self._review_list.itemDoubleClicked.connect(self._mark_reviewed_from_click)
+        body.addWidget(self._queue_list)
+        self._queue_meta.setWordWrap(True)
+        body.addWidget(self._queue_meta)
+        body.addWidget(QLabel("Open items:"))
+        body.addWidget(self._review_list)
+        return card
 
     def _labeled_value(self, label: str, bucket: dict[str, QLabel], key: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -233,6 +249,43 @@ class DashboardPage(QWidget):
             f"Pinned files: {', '.join(ws.pinned_files[:3]) or '—'}\n"
             f"Недавние артефакты: {', '.join(ws.recent_artifacts[:3]) or '—'}"
         )
+        self._render_queues(state)
+
+    def _render_queues(self, state: KnowledgeBaseState) -> None:
+        ws = self._state_store.load()
+        service = QueueService(self._inspector.repo_root, inbox_folder=self._inbox_folder)
+        self._queues = service.build_queues(state)
+        self._queue_list.clear()
+        for q in self._queues:
+            QListWidgetItem(f"[{q.priority.value.upper()}] {q.title} — {q.count}", self._queue_list)
+        if self._queues:
+            self._queue_list.setCurrentRow(0)
+
+    def _on_queue_changed(self, row: int) -> None:
+        if row < 0 or row >= len(getattr(self, "_queues", [])):
+            return
+        ws = self._state_store.load()
+        q = self._queues[row]
+        self._queue_meta.setText(f"Почему: {q.why_exists}\nРекомендация: {q.recommended_action}")
+        self._review_list.clear()
+        for item in q.open_items:
+            status = ws.review_item_status.get(item.item_id, ReviewStatus.open.value)
+            QListWidgetItem(f"{item.title} [{status}] — {item.reason}", self._review_list)
+
+    def _mark_reviewed_from_click(self, item: QListWidgetItem) -> None:
+        row = self._queue_list.currentRow()
+        idx = self._review_list.row(item)
+        if row < 0 or row >= len(getattr(self, "_queues", [])):
+            return
+        q = self._queues[row]
+        if idx < 0 or idx >= len(q.open_items):
+            return
+        ws = self._state_store.load()
+        review_item = q.open_items[idx]
+        ws.review_item_status[review_item.item_id] = ReviewStatus.reviewed.value
+        ws.last_viewed_artifact_per_section["dashboard_review"] = review_item.title
+        self._state_store.save(ws)
+        self._on_queue_changed(row)
 
 
 class SettingsPage(QWidget):
