@@ -73,3 +73,41 @@ Dashboard теперь стартовая operational-страница:
 - Не используется внешняя БД (только JSON persistence).
 - Очереди формируются эвристически из текущих файлов/слоёв; deep semantic routing можно усилить в следующей версии.
 - Основные действия по backend по-прежнему выполняются через существующие скрипты subprocess.
+
+## V3 Review / Promotion / Provenance layer
+Добавлен новый экран **Sources** (review center), который собирает целостный workflow review/provenance:
+- lineage viewer (tree/expand) для concept/collection/trace/source-note,
+- review actions с confirm + draft-first поведением,
+- compare view (left/right) с shared sources, differing claims/framing и рекомендацией merge/split/keep separate,
+- очереди review для weak provenance, promotion candidates, traces awaiting decision и source/attachment gaps.
+
+### Новые сервисы
+- `gui_app/services/provenance_service.py` — построение provenance tree:
+  - concept -> source_collections -> source_notes -> attachments,
+  - trace -> upstream matches + supporting notes.
+- `gui_app/services/review_queue_service.py` — построение V3 review queues.
+- `gui_app/services/compare_service.py` — compare двух markdown-артефактов.
+- `gui_app/services/promotion_service.py` — guided promotion-обёртка (trace/collection/multi-collection -> concept draft).
+
+### Review workflow (практически)
+1. Открыть **Sources** и выбрать очередь (например `promotion_candidates`).
+2. Выбрать элемент -> справа открыть preview и provenance tree.
+3. Запустить action (accept/refine/attach/open collections/contradiction/manual revision) с подтверждением.
+4. При необходимости сравнить текущий draft с существующим concept в compare-блоке.
+5. Принять решение: сохранить draft concept, доработать, или оставить trace.
+
+### Путь от trace к stable concept
+1. Trace попадает в `traces_awaiting_decision`.
+2. Если есть достаточная поддержка источниками — попадает в `promotion_candidates`.
+3. Через promotion flow создаётся concept draft в `12_llm_concepts`.
+4. Через review actions concept отмечается как stable (или refinement).
+5. Provenance tree остаётся explainable: concept -> collections -> notes -> source artifacts.
+
+### Manual test plan
+1. Открыть GUI и перейти в раздел **Sources**.
+2. Проверить, что queues отображаются и не пустые при наличии данных в `12_llm_concepts`, `14_llm_traces`, `raw`.
+3. Выбрать concept item и проверить дерево lineage (collection -> notes -> attachment).
+4. Выбрать trace item и проверить upstream/supporting nodes.
+5. Нажать любой review-action и убедиться в confirm-диалоге.
+6. Заполнить два пути в compare и проверить генерацию рекомендации.
+7. Проверить, что существующие страницы (Dashboard/Trace/Rebuild/Health/InBox) продолжают открываться.

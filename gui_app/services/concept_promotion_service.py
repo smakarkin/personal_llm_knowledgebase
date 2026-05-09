@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 
+from gui_app.services.frontmatter_utils import dump_frontmatter
 
 
 class ConceptPromotionService:
