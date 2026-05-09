@@ -14,10 +14,13 @@ class QueuePriority(str, Enum):
 
 
 class ReviewStatus(str, Enum):
-    open = "open"
-    reviewed = "reviewed"
+    new = "new"
+    in_review = "in_review"
     deferred = "deferred"
+    accepted = "accepted"
+    rejected = "rejected"
     promoted = "promoted"
+    archived = "archived"
 
 
 @dataclass(slots=True)
@@ -30,7 +33,7 @@ class ReviewItem:
     upstream: list[str] = field(default_factory=list)
     downstream: list[str] = field(default_factory=list)
     preview: str = ""
-    status: ReviewStatus = ReviewStatus.open
+    status: ReviewStatus = ReviewStatus.new
 
 
 @dataclass(slots=True)
@@ -44,7 +47,7 @@ class OperationalQueue:
 
     @property
     def count(self) -> int:
-        return len([i for i in self.open_items if i.status == ReviewStatus.open])
+        return len([i for i in self.open_items if i.status in {ReviewStatus.new, ReviewStatus.in_review}])
 
 
 @dataclass(slots=True)
