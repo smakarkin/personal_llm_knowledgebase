@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QLabel,
     QMessageBox,
+    QLineEdit,
     QPushButton,
     QProgressBar,
     QPlainTextEdit,
@@ -25,6 +27,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from gui_app.config import AppConfig
+from gui_app.services.workbench_state import WorkbenchStateStore
 from gui_app.services.script_runner import ScriptRunner
 from gui_app.services.health_service import HealthData, HealthIssue, HealthService
 from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, PipelineStepStatus, ScenarioPlan, ScenarioStep, TraceRunResult
@@ -32,6 +36,7 @@ from gui_app.services.state_inspector import StateInspector
 from gui_app.services.trace_service import TraceService
 from gui_app.services.scenario_planner import ScenarioPlanner
 from gui_app.services.obsidian_service import ObsidianService
+from gui_app.widgets.progress_log_widget import ProgressLogWidget
 
 PAGE_TITLES = [
     "Dashboard",
@@ -42,6 +47,7 @@ PAGE_TITLES = [
     "Sources",
     "Health",
     "Logs",
+    "Settings",
 ]
 
 
@@ -51,6 +57,7 @@ class DashboardPage(QWidget):
     def __init__(self, repo_root: Path, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
+        self._state_store = WorkbenchStateStore(repo_root / "gui_app_data")
         self._inbox_folder = inbox_folder
 
         self._header = QLabel("Dashboard")
@@ -58,6 +65,7 @@ class DashboardPage(QWidget):
         self._recommendation = QLabel("")
         self._diagnostics = QLabel("")
         self._health_summary = QLabel("Health: —")
+        self._workbench = QLabel("")
 
         self._stat_labels: dict[str, QLabel] = {}
         self._time_labels: dict[str, QLabel] = {}
@@ -92,6 +100,7 @@ class DashboardPage(QWidget):
         cards_layout.addWidget(self._make_recommendation_card(), 2, 0, 1, 2)
         cards_layout.addWidget(self._make_diagnostics_card(), 3, 0, 1, 2)
         cards_layout.addWidget(self._make_health_card(), 4, 0, 1, 2)
+        cards_layout.addWidget(self._make_workbench_card(), 5, 0, 1, 2)
 
         layout.addLayout(top_row)
         layout.addWidget(self._status_line)
@@ -166,6 +175,11 @@ class DashboardPage(QWidget):
         self._health_summary.setWordWrap(True)
         body.addWidget(self._health_summary)
         return card
+    def _make_workbench_card(self) -> QWidget:
+        card, body = self._make_card("Workbench")
+        self._workbench.setWordWrap(True)
+        body.addWidget(self._workbench)
+        return card
 
     def _labeled_value(self, label: str, bucket: dict[str, QLabel], key: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -212,6 +226,54 @@ class DashboardPage(QWidget):
             self._diagnostics.setText("Проблемы пути/файлов не обнаружены.")
         health = HealthService(self._inspector.repo_root, self._inspector.repo_root).build_health_report()
         self._health_summary.setText(f"Всего проблем: {len(health.issues)} | Категорий: {len(health.categories)}")
+        ws = self._state_store.load()
+        self._workbench.setText(
+            f"Последние запуски: {', '.join(ws.recent_runs[:3]) or '—'}\n"
+            f"Pinned actions: {', '.join(ws.pinned_actions[:3]) or '—'}\n"
+            f"Pinned files: {', '.join(ws.pinned_files[:3]) or '—'}\n"
+            f"Недавние артефакты: {', '.join(ws.recent_artifacts[:3]) or '—'}"
+        )
+
+
+class SettingsPage(QWidget):
+    def __init__(self, config: AppConfig, on_save) -> None:
+        super().__init__()
+        self._config = config
+        self._on_save = on_save
+        self._vault = QLineEdit(str(config.vault_path))
+        self._scripts = QLineEdit(str(config.scripts_path))
+        self._startup = QLineEdit(config.preferred_startup_page)
+        self._logs = QLineEdit(config.log_location)
+        self._obsidian = QCheckBox("Включить Obsidian integration mode")
+        self._obsidian.setChecked(config.obsidian_integration_mode)
+        self._candidate = QCheckBox("Показывать candidate по умолчанию")
+        self._candidate.setChecked(config.show_candidate_by_default)
+        self._save_btn = QPushButton("Сохранить настройки")
+        self._status = QLabel("")
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Настройки приложения"))
+        for label, widget in [("Путь к vault", self._vault), ("Путь к scripts", self._scripts), ("Startup page", self._startup), ("Log location", self._logs)]:
+            layout.addWidget(QLabel(label)); layout.addWidget(widget)
+        layout.addWidget(self._obsidian); layout.addWidget(self._candidate)
+        self._save_btn.clicked.connect(self._save)
+        layout.addWidget(self._save_btn); layout.addWidget(self._status); layout.addStretch(1)
+
+    def _save(self) -> None:
+        cfg = AppConfig(
+            vault_path=Path(self._vault.text().strip()),
+            scripts_path=Path(self._scripts.text().strip()),
+            inbox_folder=self._config.inbox_folder,
+            preferred_startup_page=self._startup.text().strip() or "Dashboard",
+            log_location=self._logs.text().strip() or "gui_app_data/logs",
+            obsidian_integration_mode=self._obsidian.isChecked(),
+            show_candidate_by_default=self._candidate.isChecked(),
+            data_dir=self._config.data_dir,
+        )
+        self._on_save(cfg)
+        self._status.setText("Настройки сохранены.")
 
 
 def _fmt_dt(value: datetime | None) -> str:
@@ -334,12 +396,13 @@ class RebuildPage(QWidget):
         self._scenario_by_key = {item.key: item for item in self._scenarios}
         self._worker: _ScenarioWorker | None = None
         self._obsidian = obsidian_service or ObsidianService(repo_root)
+        self._state_store = WorkbenchStateStore(repo_root / "gui_app_data")
 
         self._scenario_combo = QComboBox()
         self._description = QLabel("")
         self._progress = QProgressBar()
         self._status = QLabel("Сценарий не запущен")
-        self._log = QPlainTextEdit()
+        self._log_widget = ProgressLogWidget()
         self._run_btn = QPushButton("Запустить сценарий")
         self._clear_btn = QPushButton("Очистить лог")
 
@@ -359,12 +422,11 @@ class RebuildPage(QWidget):
 
         self._scenario_combo.currentIndexChanged.connect(self._on_scenario_changed)
         self._run_btn.clicked.connect(self._confirm_and_start)
-        self._clear_btn.clicked.connect(self._log.clear)
+        self._clear_btn.clicked.connect(lambda: self._log_widget.append("--- лог очищен пользователем ---"))
 
         self._description.setWordWrap(True)
         self._progress.setMinimum(0)
         self._progress.setValue(0)
-        self._log.setReadOnly(True)
 
         controls = QHBoxLayout()
         controls.addWidget(self._scenario_combo, 1)
@@ -376,7 +438,7 @@ class RebuildPage(QWidget):
         layout.addWidget(self._description)
         layout.addWidget(self._progress)
         layout.addWidget(self._status)
-        layout.addWidget(self._log, 1)
+        layout.addWidget(self._log_widget, 1)
 
     def _on_scenario_changed(self, index: int) -> None:
         key = self._scenario_combo.itemData(index)
@@ -408,6 +470,10 @@ class RebuildPage(QWidget):
         self._progress.setValue(0)
         self._status.setText("Запуск...")
         self._append_log(f"=== Старт сценария: {scenario.title} ===")
+        ws = self._state_store.load()
+        ws.recent_rebuild_scenarios = WorkbenchStateStore.push_recent(ws.recent_rebuild_scenarios, scenario.title)
+        ws.recent_runs = WorkbenchStateStore.push_recent(ws.recent_runs, f"Rebuild: {scenario.title}")
+        self._state_store.save(ws)
 
         self._worker = _ScenarioWorker(self._runner, scenario)
         self._worker.step_started.connect(self._on_step_started)
@@ -432,7 +498,7 @@ class RebuildPage(QWidget):
         self._scenario_combo.setEnabled(True)
 
     def _append_log(self, text: str) -> None:
-        self._log.appendPlainText(text)
+        self._log_widget.append(text)
 
 
 class InBoxPage(QWidget):
@@ -626,6 +692,7 @@ class TracePage(QWidget):
         self._promotion = ConceptPromotionService(repo_root=repo_root)
         self._worker: _TraceWorker | None = None
         self._last_report_path: Path | None = None
+        self._state_store = WorkbenchStateStore(repo_root / "gui_app_data")
 
         self._mode = QComboBox(); self._mode.addItems(["Быстрый trace", "Углублённый trace"])
         self._query_input = QPlainTextEdit()
@@ -662,12 +729,19 @@ class TracePage(QWidget):
         if not query: QMessageBox.warning(self,"Пустой запрос","Введите описание идеи или понятия."); return
         self._log.clear(); self._status.setText("Выполняется semantic trace..."); self._search_btn.setEnabled(False)
         self._worker=_TraceWorker(self._service,query); self._worker.output_line.connect(self._log.appendPlainText); self._worker.finished_with_result.connect(self._on_search_finished); self._worker.start()
+        ws = self._state_store.load()
+        ws.recent_trace_queries = WorkbenchStateStore.push_recent(ws.recent_trace_queries, query)
+        self._state_store.save(ws)
 
     def _on_search_finished(self, result: TraceRunResult) -> None:
         self._search_btn.setEnabled(True)
         if result.return_code!=0: QMessageBox.warning(self,"Ошибка",result.error_message or "Ошибка semantic trace"); return
         self._last_report_path=result.report_path; self._status.setText(f"Готово: {self._last_report_path}"); self._refresh_lists()
         if self._last_report_path and self._last_report_path.exists(): self._load_report(self._last_report_path)
+        ws = self._state_store.load()
+        ws.recent_artifacts = WorkbenchStateStore.push_recent(ws.recent_artifacts, str(self._last_report_path))
+        ws.recent_runs = WorkbenchStateStore.push_recent(ws.recent_runs, f"Trace: {self._query_input.toPlainText().strip()[:40]}")
+        self._state_store.save(ws)
 
     def _refresh_lists(self) -> None:
         self._history.clear(); [QListWidgetItem(q,self._history) for q in self._service.recent_history()]

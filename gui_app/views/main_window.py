@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui_app.config import AppConfig
-from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, TracePage, create_placeholder_page
+from gui_app.config import AppConfig, save_app_config
+from gui_app.services.workbench_state import WorkbenchStateStore
+from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, SettingsPage, TracePage, create_placeholder_page
 from gui_app.services.obsidian_service import ObsidianService
 
 
@@ -35,6 +36,8 @@ class MainWindow(QMainWindow):
 
         self._menu = QListWidget()
         self._obsidian = ObsidianService(self._config.vault_path)
+        self._state_store = WorkbenchStateStore(self._config.data_dir)
+        self._workbench_state = self._state_store.load()
         self._stack = QStackedWidget()
         self._status_bar = QStatusBar()
         self._build_ui()
@@ -42,6 +45,7 @@ class MainWindow(QMainWindow):
         self._build_menu_bar()
         self._apply_global_styles()
         self.statusBar().showMessage("Готово")
+        self._restore_last_page()
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -132,6 +136,8 @@ class MainWindow(QMainWindow):
                         scripts_path=self._config.scripts_path,
                     )
                 )
+            elif page_title == "Settings":
+                self._stack.addWidget(SettingsPage(config=self._config, on_save=self._save_settings))
             else:
                 self._stack.addWidget(create_placeholder_page(page_title))
 
@@ -171,3 +177,22 @@ class MainWindow(QMainWindow):
 
     def _bind_events(self) -> None:
         self._menu.currentRowChanged.connect(self._stack.setCurrentIndex)
+        self._menu.currentRowChanged.connect(self._remember_page)
+
+    def _remember_page(self, index: int) -> None:
+        if index < 0 or index >= len(PAGE_TITLES):
+            return
+        self._workbench_state.last_page = PAGE_TITLES[index]
+        self._state_store.save(self._workbench_state)
+
+    def _restore_last_page(self) -> None:
+        target = self._workbench_state.last_page or self._config.preferred_startup_page
+        if target in PAGE_TITLES:
+            idx = PAGE_TITLES.index(target)
+            self._menu.setCurrentRow(idx)
+
+    def _save_settings(self, config: AppConfig) -> None:
+        self._config = config
+        path = save_app_config(config)
+        self.setWindowTitle(f"Knowledge Base Control Center — {self._config.vault_path.name}")
+        self.statusBar().showMessage(f"Настройки сохранены: {path}", 4000)
