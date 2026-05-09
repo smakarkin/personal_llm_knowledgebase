@@ -111,3 +111,28 @@ Dashboard теперь стартовая operational-страница:
 5. Нажать любой review-action и убедиться в confirm-диалоге.
 6. Заполнить два пути в compare и проверить генерацию рекомендации.
 7. Проверить, что существующие страницы (Dashboard/Trace/Rebuild/Health/InBox) продолжают открываться.
+
+## V3 Local semantic infrastructure & reliability layer
+- Добавлен локальный индексатор `gui_app/services/local_semantic_index.py`:
+  - индексирует `11_llm_collections_*`, `12_llm_concepts`, `13_llm_indexes` и опционально `14_llm_traces`;
+  - поддерживает keyword + field-aware фильтры (`layer/mode/cluster`) и lightweight semantic similarity (TF-IDF cosine);
+  - хранит индекс локально в `gui_app/gui_app_data/semantic_index.json`.
+- Добавлен unified freshness service `gui_app/services/freshness_service.py`:
+  - проверяет stale-состояния между collections/concepts/indexes/traces и semantic index.
+- Добавлен reliability task history `gui_app/services/tasking_service.py`:
+  - task start/finish, статус, причины ошибки/успеха, сохранение результата в `task_history.json`.
+- Добавлен semi-automation suggestions `gui_app/services/suggestion_service.py`:
+  - формирует preview-first рекомендации без silent auto-writes.
+- В GUI добавлен экран **Search**:
+  - быстрый universal search,
+  - rebuild index из GUI,
+  - preview pane,
+  - filters/facets,
+  - freshness + suggestions блок.
+
+### Recovery / troubleshooting
+1. Если поиск пустой — нажмите **Rebuild index** на странице Search.
+2. Если freshness показывает stale:
+   - stale `concepts_vs_collections` → перегенерируйте concepts;
+   - stale `indexes_vs_concepts` → перегенерируйте index.
+3. Смотрите историю задач в `gui_app/gui_app_data/task_history.json` для причин ошибок.

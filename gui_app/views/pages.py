@@ -39,6 +39,10 @@ from gui_app.services.obsidian_service import ObsidianService
 from gui_app.services.queue_service import QueueService
 from gui_app.models.queues import ReviewStatus
 from gui_app.widgets.progress_log_widget import ProgressLogWidget
+from gui_app.services.local_semantic_index import LocalSemanticIndex
+from gui_app.services.freshness_service import FreshnessService
+from gui_app.services.tasking_service import TaskingService
+from gui_app.services.suggestion_service import SuggestionService
 
 PAGE_TITLES = [
     "Dashboard",
@@ -46,6 +50,7 @@ PAGE_TITLES = [
     "InBox",
     "Rebuild",
     "Trace",
+    "Search",
     "Sources",
     "Health",
     "Logs",
@@ -856,6 +861,59 @@ class TracePage(QWidget):
         super().closeEvent(event)
 
 
+class SearchPage(QWidget):
+    def __init__(self, repo_root: Path) -> None:
+        super().__init__()
+        self._index = LocalSemanticIndex(repo_root)
+        self._fresh = FreshnessService(repo_root)
+        self._tasks = TaskingService(repo_root)
+        self._suggest = SuggestionService()
+        self._q = QLineEdit(); self._layer = QComboBox(); self._mode = QComboBox(); self._cluster = QLineEdit()
+        self._layer.addItems(["all","collection","concept","index","trace"]); self._mode.addItems(["all","primary","candidate"])
+        self._results = QListWidget(); self._preview = QPlainTextEdit(); self._status = QLabel(); self._suggestions = QPlainTextEdit()
+        self._preview.setReadOnly(True); self._suggestions.setReadOnly(True)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        lay=QVBoxLayout(self); lay.addWidget(QLabel("Universal local semantic search (V3)"))
+        row=QHBoxLayout(); row.addWidget(self._q,1); self._q.setPlaceholderText("Смысловой запрос / keyword")
+        row.addWidget(self._layer); row.addWidget(self._mode); row.addWidget(self._cluster)
+        self._cluster.setPlaceholderText("cluster")
+        b1=QPushButton("Rebuild index"); b2=QPushButton("Search"); b3=QPushButton("Refresh freshness")
+        row.addWidget(b1); row.addWidget(b2); row.addWidget(b3); lay.addLayout(row)
+        split=QHBoxLayout(); split.addWidget(self._results,1); split.addWidget(self._preview,2); lay.addWidget(self._status); lay.addLayout(split,1); lay.addWidget(QLabel("Semi-automation suggestions")); lay.addWidget(self._suggestions)
+        b1.clicked.connect(self._rebuild); b2.clicked.connect(self._search); b3.clicked.connect(self._refresh_freshness); self._results.itemClicked.connect(self._open_hit)
+
+    def _rebuild(self) -> None:
+        t=self._tasks.start('semantic_index_rebuild')
+        try:
+            res=self._index.rebuild(include_traces=True)
+            self._tasks.finish(t.task_id, 'success', result=res)
+            self._status.setText(f"Index rebuilt: {res['documents']} docs")
+        except Exception as e:
+            self._tasks.finish(t.task_id, 'error', reason=str(e))
+            self._status.setText(f"Ошибка rebuild index: {e}")
+
+    def _search(self) -> None:
+        layer=None if self._layer.currentText()=='all' else self._layer.currentText()
+        mode=None if self._mode.currentText()=='all' else self._mode.currentText()
+        hits=self._index.search(self._q.text(), layer=layer, mode=mode, cluster=self._cluster.text().strip() or None)
+        self._results.clear()
+        for h in hits:
+            it=QListWidgetItem(f"[{h.layer}] {h.title} ({h.score:.3f})")
+            it.setData(Qt.ItemDataRole.UserRole, str(h.path)); self._results.addItem(it)
+        self._status.setText(f"Найдено: {len(hits)}")
+
+    def _open_hit(self, item: QListWidgetItem) -> None:
+        p=Path(item.data(Qt.ItemDataRole.UserRole))
+        self._preview.setPlainText(p.read_text(encoding='utf-8', errors='ignore')[:5000] if p.exists() else 'missing')
+
+    def _refresh_freshness(self) -> None:
+        f = self._fresh.compute()
+        s = self._suggest.build(f)
+        text = "Freshness:\n" + "\n".join(f"- {k}: {v}" for k, v in f.items())
+        text += "\n\nSuggestions:\n" + "\n".join(f"- {x}" for x in s["recommended_rebuild_plan"])
+        self._suggestions.setPlainText(text)
 class HealthPage(QWidget):
     """Экран health-диагностики: запуск lint и просмотр отчёта."""
 
