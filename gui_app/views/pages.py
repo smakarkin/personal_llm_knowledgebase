@@ -638,7 +638,7 @@ class InBoxPage(QWidget):
             f"Всего заметок: {len(notes)} | Готово к переносу: {ready} | Требуют внимания: {needs_attention}"
         )
         self._status_line.setText(
-            f"Критерий готовности: не пустая, без llm_skip_reason, есть осмысленная llm-разметка."
+            "Критерий готовности: не пустая, llm_processed=true, заполнены topic/type/cluster, без llm_skip_reason."
         )
         self._fill_table(notes)
         self._refresh_handoff_list()
