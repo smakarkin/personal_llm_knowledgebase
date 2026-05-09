@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from gui_app.config import DEFAULT_ZETTELKASTEN_FOLDER, LLM_COLLECTIONS_CANDIDATE_DIR, LLM_COLLECTIONS_PRIMARY_DIR, LLM_CONCEPTS_DIR, LLM_INDEXES_DIR, LLM_TRACES_DIR
+from gui_app.services.frontmatter_utils import parse_frontmatter_block
 from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, LayerState, PipelineEdge, PipelineNode, RecommendedAction
 
 
@@ -81,14 +82,42 @@ class StateInspector:
         notes: list[InboxNoteStatus] = []
         for note_path in sorted(_iter_markdown_files(inbox), key=lambda item: item.name.lower()):
             text = note_path.read_text(encoding="utf-8", errors="ignore")
-            has_primary = "llm_primary_cluster:" in text
-            has_candidates = "llm_candidate_clusters:" in text
-            has_skip_reason = "llm_skip_reason:" in text
+            meta = _parse_frontmatter(text)
+            has_primary = bool(str(meta.get("llm_primary_cluster", "")).strip())
+            has_candidates = _has_candidate_clusters(meta.get("llm_candidate_clusters"))
+            has_skip_reason = bool(str(meta.get("llm_skip_reason", "")).strip())
+            is_processed = bool(meta.get("llm_processed") is True)
+            has_topic = bool(str(meta.get("llm_topic", "")).strip())
+            has_semantic_type = bool(str(meta.get("llm_semantic_type", "")).strip())
+            has_cluster_alias = bool(str(meta.get("llm_cluster", "")).strip())
             body = text.split("---", 2)[-1].strip() if text.startswith("---") else text.strip()
             is_empty = not body
-            is_ready = (not is_empty) and (not has_skip_reason) and (has_primary or has_candidates)
+            is_ready = (
+                (not is_empty)
+                and (not has_skip_reason)
+                and is_processed
+                and has_topic
+                and has_semantic_type
+                and has_cluster_alias
+                and (has_primary or has_candidates)
+            )
             notes.append(InboxNoteStatus(note_path.name, note_path, has_primary, has_candidates, has_skip_reason, is_empty, is_ready))
         return notes
+
+
+def _parse_frontmatter(text: str) -> dict:
+    if not text.startswith("---"):
+        return {}
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return {}
+    return parse_frontmatter_block(parts[1]) or {}
+
+
+def _has_candidate_clusters(raw_value: object) -> bool:
+    if isinstance(raw_value, list):
+        return any(str(item).strip() for item in raw_value)
+    return bool(str(raw_value or "").strip())
 
 
 def _iter_markdown_files(folder: Path) -> list[Path]:
