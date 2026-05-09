@@ -1,22 +1,75 @@
-"""Typed models for GUI state and workflow statuses."""
+"""Typed models for GUI orchestration/state V2."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-
-PipelineStatus = Literal["ok", "needs_attention", "stale", "not_run"]
+PipelineStatus = Literal["ok", "needs_attention", "stale", "not_run", "blocked", "missing"]
 
 
 @dataclass(frozen=True)
-class PipelineStepStatus:
+class LayerState:
+    """Состояние отдельного слоя/этапа knowledge base."""
+
+    node_id: str
     title: str
     status: PipelineStatus
-    explanation: str
-    link: str
+    reason: str
+    inputs_last_modified: datetime | None
+    outputs_last_modified: datetime | None
+    output_files: int
+    stale_sources: tuple[str, ...] = ()
+    blocking_nodes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PipelineNode:
+    """Узел state-graph с явными зависимостями и артефактами."""
+
+    node_id: str
+    title: str
+    command: tuple[str, ...]
+    dependencies: tuple[str, ...] = ()
+    output_dirs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PipelineEdge:
+    """Ребро между узлами графа pipeline."""
+
+    source: str
+    target: str
+
+
+@dataclass(frozen=True)
+class RecommendedAction:
+    """Объяснимая рекомендация следующего шага."""
+
+    node_id: str
+    title: str
+    command: tuple[str, ...]
+    reason: str
+    impacted_layers: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ScenarioStep:
+    title: str
+    script_name: str
+    args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ScenarioPlan:
+    """План запуска сценария для Rebuild/Plan Preview."""
+
+    key: str
+    title: str
+    description: str
+    steps: tuple[ScenarioStep, ...]
 
 
 @dataclass(frozen=True)
@@ -31,21 +84,6 @@ class InboxNoteStatus:
 
 
 @dataclass(frozen=True)
-class RebuildScenario:
-    key: str
-    title: str
-    description: str
-    steps: tuple["RebuildStep", ...]
-
-
-@dataclass(frozen=True)
-class RebuildStep:
-    title: str
-    script_name: str
-    args: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
 class TraceRunResult:
     return_code: int
     stdout: str
@@ -55,19 +93,19 @@ class TraceRunResult:
 
 @dataclass(frozen=True)
 class KnowledgeBaseState:
+    """Сводное состояние knowledge base + оркестрационный граф."""
+
     inbox_markdown_count: int
     zettelkasten_markdown_count: int
-    zettelkasten_missing_primary_cluster_count: int
-    collections_primary_count: int
-    collections_candidate_count: int
-    concepts_count: int
-    indexes_count: int
     traces_count: int
-    inbox_last_modified: datetime | None
-    zettelkasten_last_modified: datetime | None
-    collections_primary_last_modified: datetime | None
-    collections_candidate_last_modified: datetime | None
-    concepts_last_modified: datetime | None
-    indexes_last_modified: datetime | None
-    recommended_next_step: str
-    diagnostics: list[str]
+    layer_states: tuple[LayerState, ...]
+    recommended_action: RecommendedAction
+    diagnostics: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PipelineStepStatus:
+    title: str
+    status: PipelineStatus
+    explanation: str
+    link: str

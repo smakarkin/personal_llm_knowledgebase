@@ -27,11 +27,12 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from gui_app.services.script_runner import ScriptRunner, build_rebuild_scenarios
+from gui_app.services.script_runner import ScriptRunner
 from gui_app.services.health_service import HealthData, HealthService
-from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, PipelineStepStatus, RebuildScenario, RebuildStep, TraceRunResult
+from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, PipelineStepStatus, ScenarioPlan, ScenarioStep, TraceRunResult
 from gui_app.services.state_inspector import StateInspector
 from gui_app.services.trace_service import TraceService
+from gui_app.services.scenario_planner import ScenarioPlanner
 
 PAGE_TITLES = [
     "Dashboard",
@@ -182,20 +183,23 @@ class DashboardPage(QWidget):
 
         self._stat_labels["inbox_md"].setText(str(state.inbox_markdown_count))
         self._stat_labels["zettelkasten_md"].setText(str(state.zettelkasten_markdown_count))
-        self._stat_labels["missing_primary"].setText(str(state.zettelkasten_missing_primary_cluster_count))
+        self._stat_labels["missing_primary"].setText("—")
 
-        self._stat_labels["collections_primary"].setText(str(state.collections_primary_count))
-        self._stat_labels["collections_candidate"].setText(str(state.collections_candidate_count))
-        self._stat_labels["concepts"].setText(str(state.concepts_count))
-        self._stat_labels["indexes"].setText(str(state.indexes_count))
+        by_id = {item.node_id: item for item in state.layer_states}
+        self._stat_labels["collections_primary"].setText(str(by_id.get("build_primary").output_files if by_id.get("build_primary") else 0))
+        self._stat_labels["collections_candidate"].setText(str(by_id.get("build_candidate").output_files if by_id.get("build_candidate") else 0))
+        concepts_total = sum(by_id.get(k).output_files for k in ("generate_primary_concepts", "generate_candidate_concepts") if by_id.get(k))
+        indexes_total = sum(by_id.get(k).output_files for k in ("generate_primary_index", "generate_candidate_index") if by_id.get(k))
+        self._stat_labels["concepts"].setText(str(concepts_total))
+        self._stat_labels["indexes"].setText(str(indexes_total))
         self._stat_labels["traces"].setText(str(state.traces_count))
 
-        self._time_labels["collections_primary"].setText(_fmt_dt(state.collections_primary_last_modified))
-        self._time_labels["collections_candidate"].setText(_fmt_dt(state.collections_candidate_last_modified))
-        self._time_labels["concepts"].setText(_fmt_dt(state.concepts_last_modified))
-        self._time_labels["indexes"].setText(_fmt_dt(state.indexes_last_modified))
+        self._time_labels["collections_primary"].setText(_fmt_dt(by_id.get("build_primary").outputs_last_modified if by_id.get("build_primary") else None))
+        self._time_labels["collections_candidate"].setText(_fmt_dt(by_id.get("build_candidate").outputs_last_modified if by_id.get("build_candidate") else None))
+        self._time_labels["concepts"].setText(_fmt_dt(by_id.get("generate_primary_concepts").outputs_last_modified if by_id.get("generate_primary_concepts") else None))
+        self._time_labels["indexes"].setText(_fmt_dt(by_id.get("generate_primary_index").outputs_last_modified if by_id.get("generate_primary_index") else None))
 
-        self._recommendation.setText(state.recommended_next_step)
+        self._recommendation.setText(state.recommended_action.reason)
         if state.diagnostics:
             self._diagnostics.setText("\n".join(f"• {item}" for item in state.diagnostics))
         else:
@@ -294,7 +298,7 @@ class _ScenarioWorker(QThread):
     output_line = Signal(str)
     finished_with_code = Signal(int)
 
-    def __init__(self, runner: ScriptRunner, scenario: RebuildScenario) -> None:
+    def __init__(self, runner: ScriptRunner, scenario: ScenarioPlan) -> None:
         super().__init__()
         self._runner = runner
         self._scenario = scenario
@@ -315,7 +319,10 @@ class RebuildPage(QWidget):
     def __init__(self, repo_root: Path, scripts_path: Path, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
-        self._scenarios = build_rebuild_scenarios(inbox_folder=inbox_folder, zettelkasten_folder="Zettelkasten")
+        self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
+        self._planner = ScenarioPlanner(self._inspector.nodes)
+        state = self._inspector.inspect()
+        self._scenarios = [self._planner.build_minimal_plan(state), self._planner.build_safe_plan(state), self._planner.build_full_plan(state)]
         self._scenario_by_key = {item.key: item for item in self._scenarios}
         self._worker: _ScenarioWorker | None = None
 
@@ -385,7 +392,7 @@ class RebuildPage(QWidget):
             return
         self._start_scenario(scenario)
 
-    def _start_scenario(self, scenario: RebuildScenario) -> None:
+    def _start_scenario(self, scenario: ScenarioPlan) -> None:
         self._run_btn.setEnabled(False)
         self._scenario_combo.setEnabled(False)
         self._progress.setMaximum(len(scenario.steps))
@@ -510,11 +517,11 @@ class InBoxPage(QWidget):
         self._table.resizeColumnsToContents()
 
     def _run_classification(self) -> None:
-        scenario = RebuildScenario(
+        scenario = ScenarioPlan(
             key="classify_inbox_only",
             title="Классификация InBox",
             description=f"Запуск propose_clusters.py для папки {self._inbox_folder}.",
-            steps=(RebuildStep("Классификация InBox", "propose_clusters.py", (self._inbox_folder,)),),
+            steps=(ScenarioStep("Классификация InBox", "propose_clusters.py", (self._inbox_folder,)),),
         )
         self._classify_btn.setEnabled(False)
         self._status_line.setText("Запуск классификации InBox...")
@@ -782,38 +789,10 @@ class HealthPage(QWidget):
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[PipelineStepStatus]:
-    collections_latest = _newest(state.collections_primary_last_modified, state.collections_candidate_last_modified)
-    concepts_stale = _is_older(state.concepts_last_modified, collections_latest)
-    indexes_stale = _is_older(state.indexes_last_modified, state.concepts_last_modified)
-
-    return [
-        PipelineStepStatus("InBox ingest", "needs_attention" if state.inbox_markdown_count > 0 else "ok",
-            f"Во входящих {state.inbox_markdown_count} заметок: нужен разбор." if state.inbox_markdown_count > 0 else "Входящие пусты или уже разобраны.",
-            "Перейти к InBox"),
-        PipelineStepStatus("Classification", "needs_attention" if state.zettelkasten_missing_primary_cluster_count > 0 else "ok",
-            f"Без llm_primary_cluster: {state.zettelkasten_missing_primary_cluster_count}." if state.zettelkasten_missing_primary_cluster_count > 0 else "Ключевые llm-кластеры в заметках присутствуют.",
-            "Перейти к Health"),
-        PipelineStepStatus("Primary collections", "not_run" if state.collections_primary_count == 0 else "ok", f"Файлов primary collections: {state.collections_primary_count}.", "Перейти к Pipeline"),
-        PipelineStepStatus("Candidate collections", "not_run" if state.collections_candidate_count == 0 else "ok", f"Файлов candidate collections: {state.collections_candidate_count}.", "Перейти к Pipeline"),
-        PipelineStepStatus("Concepts", "not_run" if state.concepts_count == 0 else ("stale" if concepts_stale else "ok"),
-            "Concepts отсутствуют." if state.concepts_count == 0 else ("Concepts старее collections: рекомендуется пересборка." if concepts_stale else "Concepts актуальны относительно collections."),
-            "Перейти к Pipeline"),
-        PipelineStepStatus("Indexes", "not_run" if state.indexes_count == 0 else ("stale" if indexes_stale else "ok"),
-            "Indexes отсутствуют." if state.indexes_count == 0 else ("Indexes старее concepts: рекомендуется пересборка." if indexes_stale else "Indexes актуальны."),
-            "Перейти к Pipeline"),
-        PipelineStepStatus("Trace / semantic search", "not_run" if state.traces_count == 0 else "ok", f"Файлов trace-слоя: {state.traces_count}.", "Перейти к Trace"),
-        PipelineStepStatus("Health check", "needs_attention" if state.diagnostics else "ok", "Найдены диагностические замечания." if state.diagnostics else "Проблемы путей и структуры не обнаружены.", "Перейти к Health"),
-        PipelineStepStatus("Manual transfer to Zettelkasten", "needs_attention" if state.inbox_markdown_count > 0 else "ok",
-            "Есть входящие, перенос в Zettelkasten ещё не завершён." if state.inbox_markdown_count > 0 else "Нет входящих для ручного переноса.", "Перейти к InBox"),
-    ]
-
-def _is_older(target: datetime | None, baseline: datetime | None) -> bool:
-    return bool(target and baseline and target < baseline)
-
-
-def _newest(first: datetime | None, second: datetime | None) -> datetime | None:
-    values = [value for value in (first, second) if value is not None]
-    return max(values) if values else None
+    steps: list[PipelineStepStatus] = []
+    for layer in state.layer_states:
+        steps.append(PipelineStepStatus(layer.title, layer.status, layer.reason, "Открыть Rebuild"))
+    return steps
 
 
 def create_placeholder_page(title: str) -> QWidget:
