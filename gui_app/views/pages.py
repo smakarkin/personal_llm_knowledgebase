@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QTableWidget,
     QTableWidgetItem,
+    QScrollArea,
 )
 
 from gui_app.config import AppConfig
@@ -113,10 +114,19 @@ class DashboardPage(QWidget):
         cards_layout.addWidget(self._make_workbench_card(), 5, 0, 1, 2)
         cards_layout.addWidget(self._make_queues_card(), 6, 0, 1, 2)
 
-        layout.addLayout(top_row)
-        layout.addWidget(self._status_line)
-        layout.addLayout(cards_layout)
-        layout.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(12)
+        scroll_layout.addLayout(top_row)
+        scroll_layout.addWidget(self._status_line)
+        scroll_layout.addLayout(cards_layout)
+        scroll_layout.addStretch(1)
+        scroll.setWidget(scroll_content)
+
+        layout.addWidget(scroll)
 
     def _make_card(self, title: str) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame()

@@ -54,31 +54,31 @@ class WorkstationPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.addWidget(QLabel("Workstation V4"))
+        root.addWidget(QLabel("Рабочая станция V4"))
         grid = QGridLayout()
 
         left = QWidget(); ll = QVBoxLayout(left)
-        ll.addWidget(QLabel("Guided workflow"))
+        ll.addWidget(QLabel("Пошаговый сценарий"))
         self._workflow_select.addItems([f"{w.title}" for w in self._workflows])
         ll.addWidget(self._workflow_select)
         row = QHBoxLayout()
-        b_start = QPushButton("Start/Resume")
+        b_start = QPushButton("Начать / продолжить")
         b_start.clicked.connect(self._start_or_resume)
-        b_next = QPushButton("Next")
+        b_next = QPushButton("Следующий шаг")
         b_next.clicked.connect(self._next_step)
         row.addWidget(b_start); row.addWidget(b_next)
         ll.addLayout(row)
-        ll.addWidget(QLabel("Session memory"))
+        ll.addWidget(QLabel("Память сессий"))
         ll.addWidget(self._sessions)
 
         center = QWidget(); cl = QVBoxLayout(center)
-        cl.addWidget(QLabel("Explainable next actions (3-5)"))
+        cl.addWidget(QLabel("Понятные следующие действия (3–5)"))
         cl.addWidget(self._actions)
-        cl.addWidget(QLabel("Quick command palette"))
+        cl.addWidget(QLabel("Быстрые команды"))
         cl.addWidget(self._commands)
 
         right = QWidget(); rl = QVBoxLayout(right)
-        rl.addWidget(QLabel("Details / why this matters"))
+        rl.addWidget(QLabel("Подробности / почему это важно"))
         rl.addWidget(self._details)
 
         grid.addWidget(left, 0, 0); grid.addWidget(center, 0, 1); grid.addWidget(right, 0, 2)
@@ -89,10 +89,10 @@ class WorkstationPage(QWidget):
 
     def _build_workflows(self) -> list[GuidedWorkflow]:
         return [
-            GuidedWorkflow("morning", "Morning review", "Понять текущее состояние и риски.", ("Dashboard refresh", "Review urgent queues", "Pick top action"), "Снижает вероятность пропуска критичных проблем."),
-            GuidedWorkflow("inbox", "InBox triage", "Разобрать входящие заметки.", ("Inspect InBox", "Classify", "Prepare transfer bundle"), "Стабилизирует поток новых знаний."),
-            GuidedWorkflow("refresh", "Knowledge refresh", "Освежить LLM-слои.", ("Build collections", "Generate concepts", "Generate indexes"), "Поддерживает актуальность knowledge layer."),
-            GuidedWorkflow("trace", "Trace investigation", "Проверить спорные связи.", ("Select trace", "Inspect evidence", "Decision"), "Повышает explainability и качество концептов."),
+            GuidedWorkflow("morning", "Утренний обзор", "Понять текущее состояние и риски.", ("Обновить дашборд", "Проверить срочные очереди", "Выбрать главное действие"), "Снижает вероятность пропуска критичных проблем."),
+            GuidedWorkflow("inbox", "Разбор InBox", "Разобрать входящие заметки.", ("Проверить InBox", "Классифицировать", "Подготовить перенос"), "Стабилизирует поток новых знаний."),
+            GuidedWorkflow("refresh", "Обновление базы знаний", "Освежить LLM-слои.", ("Собрать коллекции", "Сгенерировать концепты", "Сгенерировать индексы"), "Поддерживает актуальность слоя знаний."),
+            GuidedWorkflow("trace", "Проверка трасс", "Проверить спорные связи.", ("Выбрать трассу", "Проверить доказательства", "Принять решение"), "Повышает объяснимость и качество концептов."),
         ]
 
     def refresh(self) -> None:
@@ -110,19 +110,19 @@ class WorkstationPage(QWidget):
         self._actions.clear()
         state = self._inspector.inspect()
         actions = [
-            ("urgent maintenance", "Запустить lint и health-check", "Снижает операционные риски прямо сейчас.", "низкая", ["Health", "raw", "12/13"]),
-            ("high leverage knowledge work", state.recommended_action.title, state.recommended_action.reason, "средняя", list(state.recommended_action.impacted_layers)),
-            ("safe cleanup", "Review deferred queue items", "Закрывает накопившиеся ручные решения без risky writes.", "низкая", ["Review queues"]),
-            ("exploratory work", "Trace investigation session", "Помогает найти новые концепты и противоречия.", "средняя", ["14_llm_traces"]),
+            ("срочное обслуживание", "Запустить lint и health-check", "Снижает операционные риски прямо сейчас.", "низкая", ["Health", "raw", "12/13"]),
+            ("важная работа со знаниями", state.recommended_action.title, state.recommended_action.reason, "средняя", list(state.recommended_action.impacted_layers)),
+            ("безопасная очистка", "Проверить отложенные элементы очереди", "Закрывает накопившиеся ручные решения без рискованных изменений.", "низкая", ["Очереди review"]),
+            ("исследование", "Сессия проверки трасс", "Помогает найти новые концепты и противоречия.", "средняя", ["14_llm_traces"]),
         ]
         for group, title, why, effort, layers in actions[:5]:
             item = QListWidgetItem(f"[{group}] {title} ({effort})")
-            item.setData(32, f"Benefit: {why}\nWhy now: based on current state.\nPrerequisites: none/basic.\nRelated: {', '.join(layers) or '—'}")
+            item.setData(32, f"Польза: {why}\nПочему сейчас: основано на текущем состоянии.\nТребования: нет/базовые.\nСвязано с: {', '.join(layers) or '—'}")
             self._actions.addItem(item)
 
     def _fill_commands(self) -> None:
         self._commands.clear()
-        for cmd in ["Open Dashboard", "Open InBox", "Open Sources Review", "Open Health", "Open Trace", "Export transfer queue"]:
+        for cmd in ["Открыть Dashboard", "Открыть InBox", "Открыть проверку источников", "Открыть Health", "Открыть Trace", "Экспортировать очередь переноса"]:
             self._commands.addItem(cmd)
 
     def _start_or_resume(self) -> None:
@@ -130,7 +130,7 @@ class WorkstationPage(QWidget):
         session = WorkflowSession(session_id=str(uuid.uuid4()), workflow_id=wf.workflow_id, step_index=0)
         self._memory.save_session(session)
         self._current_session_id = session.session_id
-        self._details.setPlainText(f"{wf.title}\nGoal: {wf.goal}\nWhy: {wf.why}\nCurrent step: {wf.steps[0]}")
+        self._details.setPlainText(f"{wf.title}\nЦель: {wf.goal}\nПочему: {wf.why}\nТекущий шаг: {wf.steps[0]}")
         self.refresh()
 
     def _next_step(self) -> None:
@@ -157,9 +157,9 @@ class WorkstationPage(QWidget):
             if wf is not None:
                 step_label = "Завершено" if done else wf.steps[next_step_index]
                 self._details.setPlainText(
-                    f"{wf.title}\nStep: {session.step_index}/{len(wf.steps)}\nStatus: {session.status}\nCurrent: {step_label}"
+                    f"{wf.title}\nШаг: {session.step_index}/{len(wf.steps)}\nСтатус: {session.status}\nТекущий: {step_label}"
                 )
         self.refresh()
 
     def _focus_command(self, item: QListWidgetItem) -> None:
-        self._details.setPlainText(f"Command: {item.text()}\nЭто quick access/handoff команда (safe-first, preview-first).")
+        self._details.setPlainText(f"Команда: {item.text()}\nЭто команда быстрого доступа (сначала безопасный просмотр).")
