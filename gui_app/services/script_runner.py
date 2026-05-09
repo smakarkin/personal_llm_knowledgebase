@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import subprocess
+import threading
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -25,6 +26,20 @@ class ScriptRunner:
     def __init__(self, repo_root: Path, scripts_path: Path | None = None) -> None:
         self.repo_root = repo_root
         self.scripts_path = scripts_path or repo_root
+        self._lock = threading.Lock()
+        self._current_process: subprocess.Popen[str] | None = None
+
+    def cancel_current(self) -> None:
+        """Пытается остановить текущий streaming-процесс (если он запущен)."""
+        with self._lock:
+            process = self._current_process
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
     def run_script(self, script_name: str, args: Iterable[str] | None = None) -> ScriptResult:
         args = list(args or [])
@@ -98,16 +113,20 @@ class ScriptRunner:
             text=True,
             bufsize=1,
         )
+        with self._lock:
+            self._current_process = process
 
         lines: list[str] = []
-        assert process.stdout is not None
-        for line in process.stdout:
-            lines.append(line)
-            if on_output:
-                on_output(line.rstrip("\n"))
-
-        return_code = process.wait()
+        try:
+            assert process.stdout is not None
+            for line in process.stdout:
+                lines.append(line)
+                if on_output:
+                    on_output(line.rstrip("\n"))
+            return_code = process.wait()
+        finally:
+            with self._lock:
+                if self._current_process is process:
+                    self._current_process = None
         output = "".join(lines)
         return ScriptResult(return_code=return_code, stdout=output, stderr="")
-
-
