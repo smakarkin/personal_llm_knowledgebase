@@ -1,4 +1,4 @@
-"""Конфигурация GUI-приложения (без отдельного экрана настроек)."""
+"""Конфигурация GUI-приложения и пользовательских настроек."""
 
 from __future__ import annotations
 
@@ -23,6 +23,11 @@ class AppConfig:
     vault_path: Path
     scripts_path: Path
     inbox_folder: str
+    preferred_startup_page: str = "Dashboard"
+    log_location: str = "gui_app_data/logs"
+    obsidian_integration_mode: bool = True
+    show_candidate_by_default: bool = True
+    data_dir: Path = Path("gui_app_data")
 
 
 def load_app_config(config_path: Path | None = None) -> AppConfig:
@@ -47,7 +52,32 @@ def load_app_config(config_path: Path | None = None) -> AppConfig:
     vault_path = _resolve_path(vault_raw, base_dir=selected.parent, fallback=repo_root)
     scripts_path = _resolve_path(scripts_raw, base_dir=selected.parent, fallback=repo_root)
 
-    return AppConfig(vault_path=vault_path, scripts_path=scripts_path, inbox_folder=str(inbox_folder))
+    return AppConfig(
+        vault_path=vault_path,
+        scripts_path=scripts_path,
+        inbox_folder=str(inbox_folder),
+        preferred_startup_page=str(payload.get("preferred_startup_page", "Dashboard")),
+        log_location=str(payload.get("log_location", "gui_app_data/logs")),
+        obsidian_integration_mode=bool(payload.get("obsidian_integration_mode", True)),
+        show_candidate_by_default=bool(payload.get("show_candidate_by_default", True)),
+        data_dir=_resolve_path(payload.get("data_dir", "gui_app_data"), base_dir=selected.parent, fallback=repo_root / "gui_app_data"),
+    )
+
+
+def save_app_config(config: AppConfig, config_path: Path | None = None) -> Path:
+    selected = _select_config_path(config_path) or (Path(__file__).resolve().parent / "config.local.json")
+    payload = {
+        "vault_path": str(config.vault_path),
+        "scripts_path": str(config.scripts_path),
+        "inbox_folder": config.inbox_folder,
+        "preferred_startup_page": config.preferred_startup_page,
+        "log_location": config.log_location,
+        "obsidian_integration_mode": config.obsidian_integration_mode,
+        "show_candidate_by_default": config.show_candidate_by_default,
+        "data_dir": str(config.data_dir),
+    }
+    selected.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return selected
 
 
 def _select_config_path(explicit: Path | None) -> Path | None:

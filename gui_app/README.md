@@ -1,8 +1,19 @@
-# GUI MVP для управления Knowledge Base
+# GUI V2 (Workbench) для управления Knowledge Base
 
 Это первый каркас desktop-приложения на **PySide6** поверх существующих Python-скриптов.
 
-## Что уже есть (MVP polish)
+## Что добавлено в V2 Workbench layer
+- Экран **Settings** с сохранением рабочих настроек (пути, startup page, режимы).
+- Локальная persistence в `gui_app_data/workbench_state.json`:
+  - последний экран,
+  - последние trace-запросы,
+  - последние rebuild-сценарии,
+  - pinned/recent артефакты и действия.
+- Dashboard теперь показывает блок Workbench: последние запуски, pinned actions/files, недавние артефакты.
+- Для Rebuild добавлен единый progress/log widget (статус + live log + copy/open лог-файл).
+- Архитектурно вынесен `WorkbenchStateStore` в отдельный сервис.
+
+## Что уже есть (MVP + V2)
 - Единый стиль кнопок и статусных элементов.
 - Dashboard с заметным блоком **«Рекомендуемый следующий шаг»** и диагностикой.
 - Pipeline Map с цветовой индикацией статусов этапов (`OK`, `Требует внимания`, `Устарело`, `Не запускалось`).
@@ -37,8 +48,9 @@ python -m gui_app.main
 - **Trace** — semantic trace-поиск и предпросмотр отчётов.
 - **Health** — запуск lint и обзор категорий проблем + полный текст отчёта.
 - **Sources / Logs** — заглушки на уровне MVP.
+- **Settings** — настройки workbench и запуск по preferred page.
 
-## Конфиг путей (без GUI)
+## Конфиг и локальное состояние
 По умолчанию приложение читает `gui_app/config.local.json`, а если его нет — `gui_app/config.json`.
 
 Поля:
@@ -56,3 +68,11 @@ python -m gui_app.main
 ```
 
 Рекомендуется создать `gui_app/config.local.json` со своими путями и не коммитить его.
+
+Локальное состояние GUI хранится в:
+- `gui_app_data/workbench_state.json`
+
+## Known limitations
+- Пока нет cloud sync/аккаунтов и совместного состояния между устройствами.
+- Progress/log widget полноценно подключён в Rebuild; для Trace/Health используется текущий UI-лог и будет унифицирован в следующем шаге.
+- История/pinned-объекты сохраняются локально JSON-файлом без БД.
