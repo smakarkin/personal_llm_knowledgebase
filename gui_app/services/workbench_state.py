@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from typing import Literal
 from pathlib import Path
 
 
@@ -16,6 +17,14 @@ class WorkbenchState:
     pinned_actions: list[str] = field(default_factory=list)
     recent_artifacts: list[str] = field(default_factory=list)
     recent_runs: list[str] = field(default_factory=list)
+    dismissed_recommendations: list[str] = field(default_factory=list)
+    deferred_review_items: list[str] = field(default_factory=list)
+    pinned_queues: list[str] = field(default_factory=list)
+    recent_scenarios: list[str] = field(default_factory=list)
+    work_mode_preferences: dict[str, str] = field(default_factory=dict)
+    ui_sections_expanded: dict[str, bool] = field(default_factory=dict)
+    last_viewed_artifact_per_section: dict[str, str] = field(default_factory=dict)
+    review_item_status: dict[str, str] = field(default_factory=dict)
 
 
 class WorkbenchStateStore:

@@ -1,78 +1,75 @@
-# GUI V2 (Workbench) для управления Knowledge Base
+# GUI V3 — Knowledge Operations Center (desktop-first)
 
-Это первый каркас desktop-приложения на **PySide6** поверх существующих Python-скриптов.
-
-## Что добавлено в V2 Workbench layer
-- Экран **Settings** с сохранением рабочих настроек (пути, startup page, режимы).
-- Локальная persistence в `gui_app_data/workbench_state.json`:
-  - последний экран,
-  - последние trace-запросы,
-  - последние rebuild-сценарии,
-  - pinned/recent артефакты и действия.
-- Dashboard теперь показывает блок Workbench: последние запуски, pinned actions/files, недавние артефакты.
-- Для Rebuild добавлен единый progress/log widget (статус + live log + copy/open лог-файл).
-- Архитектурно вынесен `WorkbenchStateStore` в отдельный сервис.
-
-## Что уже есть (MVP + V2)
-- Единый стиль кнопок и статусных элементов.
-- Dashboard с заметным блоком **«Рекомендуемый следующий шаг»** и диагностикой.
-- Pipeline Map с цветовой индикацией статусов этапов (`OK`, `Требует внимания`, `Устарело`, `Не запускалось`).
-- InBox с понятной маркировкой заметок «Готово к переносу» (ручной перенос в Obsidian).
-- Rebuild с подтверждением перед запуском сценария.
-- Trace и Health с удобной preview-area и логом.
-- Нижний статус-бар с последним действием.
-- Меню «Файл → Открыть vault root».
-- Более безопасная обработка отсутствующих optional-скриптов.
-
-## Установка
-Из корня репозитория:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # для Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-```
+GUI остаётся **thin orchestration layer** над существующими `scripts/*.py` и структурой Obsidian-vault.
 
 ## Запуск
-Из корня репозитория:
-
 ```bash
 python -m gui_app.main
 ```
 
-## Структура экранов
-- **Dashboard** — текущее состояние слоёв, таймстемпы, рекомендации следующего шага.
-- **Pipeline Map** — карта этапов ingest→classify→collections→concepts→index с подсветкой.
-- **InBox** — список заметок входящих и готовность к ручному переносу.
-- **Rebuild** — запуск готовых сценариев (primary/candidate/full) с логом.
-- **Trace** — semantic trace-поиск и предпросмотр отчётов.
-- **Health** — запуск lint и обзор категорий проблем + полный текст отчёта.
-- **Sources / Logs** — заглушки на уровне MVP.
-- **Settings** — настройки workbench и запуск по preferred page.
+## Новая операционная модель V3
+Вместо «набор экранов» приложение теперь работает как **центр рабочих очередей**:
+- InBox Queue
+- Ready to Transfer Queue
+- Rebuild Queue
+- Trace Review Queue
+- Concept Promotion Queue
+- Source Review Queue
+- Health Attention Queue
 
-## Конфиг и локальное состояние
-По умолчанию приложение читает `gui_app/config.local.json`, а если его нет — `gui_app/config.json`.
+Для каждой очереди показываются:
+- count,
+- severity/priority,
+- why it exists,
+- recommended action,
+- open items.
 
-Поля:
-- `vault_path` — путь к Obsidian-хранилищу (где лежат InBox/Zettelkasten/LLM-слои).
-- `scripts_path` — путь к папке с backend-скриптами.
-- `inbox_folder` — имя папки входящих в vault (например, `__Inbox`).
+## Dashboard V3
+Dashboard теперь стартовая operational-страница:
+- summary cards по состоянию базы,
+- active queues,
+- review-list с unified item status,
+- recent operations/pinned state,
+- health summary и диагностика,
+- actionable follow-up в одной точке.
 
-Пример:
-```json
-{
-  "vault_path": "../my_obsidian_vault",
-  "scripts_path": "..",
-  "inbox_folder": "__Inbox"
-}
-```
+## Unified review workflow
+Единая модель review item (`gui_app/models/queues.py`):
+- open item,
+- preview/reason,
+- upstream/downstream контекст (модель поддерживает поля),
+- mark reviewed/deferred/promoted (persisted в local state),
+- открыть связанный артефакт (через существующие сервисы).
 
-Рекомендуется создать `gui_app/config.local.json` со своими путями и не коммитить его.
+## Work modes
+Сервис work-modes добавляет task-oriented режимы:
+- Быстро разобрать входящие,
+- Обновить knowledge layer,
+- Исследовать идею,
+- Очистить/починить базу,
+- Работать с источниками,
+- Подготовить перенос в Zettelkasten.
 
-Локальное состояние GUI хранится в:
-- `gui_app_data/workbench_state.json`
+## Local persistence V3
+`gui_app_data/workbench_state.json` теперь хранит дополнительно:
+- dismissed recommendations,
+- deferred review items,
+- pinned queues,
+- pinned files,
+- recent scenarios,
+- work mode preferences,
+- expanded/collapsed UI sections,
+- last viewed artifact per section,
+- review item status map.
+
+## Архитектура (cleaner split)
+- `models/` — typed dataclasses для статусов, очередей, review item.
+- `services/` — инспекция состояния, queue builder, скрипт-раннеры, health/trace.
+- `views/` — pages + main window.
+- `widgets/` — переиспользуемые UI-блоки (progress/log).
+- `persistence/` — реализована через `WorkbenchStateStore` (JSON local-first).
 
 ## Known limitations
-- Пока нет cloud sync/аккаунтов и совместного состояния между устройствами.
-- Progress/log widget полноценно подключён в Rebuild; для Trace/Health используется текущий UI-лог и будет унифицирован в следующем шаге.
-- История/pinned-объекты сохраняются локально JSON-файлом без БД.
+- Не используется внешняя БД (только JSON persistence).
+- Очереди формируются эвристически из текущих файлов/слоёв; deep semantic routing можно усилить в следующей версии.
+- Основные действия по backend по-прежнему выполняются через существующие скрипты subprocess.
