@@ -1,5 +1,10 @@
 {
-  "vault_path": "C:/Users/smaka/OneDrive/Документы/04_Zettelkasten/Zettelkasten",
-  "scripts_path": "C:/Users/smaka/OneDrive/Документы/04_Zettelkasten/scripts",
-  "inbox_folder": "__Inbox"
+  "vault_path": "C:\\Users\\smaka\\OneDrive\\Документы\\04_Zettelkasten\\Zettelkasten",
+  "scripts_path": "C:\\Users\\smaka\\OneDrive\\Документы\\04_Zettelkasten\\scripts",
+  "inbox_folder": "__Inbox",
+  "preferred_startup_page": "Dashboard",
+  "log_location": "gui_app_data/logs",
+  "obsidian_integration_mode": true,
+  "show_candidate_by_default": true,
+  "data_dir": "C:\\Users\\smaka\\OneDrive\\Документы\\04_Zettelkasten\\scripts\\gui_app\\gui_app_data"
 }
