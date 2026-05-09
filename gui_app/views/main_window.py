@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -18,10 +18,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QUrl
 
 from gui_app.config import AppConfig
 from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, TracePage, create_placeholder_page
+from gui_app.services.obsidian_service import ObsidianService
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 760)
 
         self._menu = QListWidget()
+        self._obsidian = ObsidianService(self._config.vault_path)
         self._stack = QStackedWidget()
         self._status_bar = QStatusBar()
         self._build_ui()
@@ -104,6 +105,7 @@ class MainWindow(QMainWindow):
                     RebuildPage(
                         repo_root=self._config.vault_path,
                         scripts_path=self._config.scripts_path,
+                        obsidian_service=self._obsidian,
                         inbox_folder=self._config.inbox_folder,
                     )
                 )
@@ -112,6 +114,7 @@ class MainWindow(QMainWindow):
                     InBoxPage(
                         repo_root=self._config.vault_path,
                         scripts_path=self._config.scripts_path,
+                        obsidian_service=self._obsidian,
                         inbox_folder=self._config.inbox_folder,
                     )
                 )
@@ -143,7 +146,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self._status_bar)
 
     def _open_vault_root(self) -> None:
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._config.vault_path)))
+        self._obsidian.open_vault_root()
         self.statusBar().showMessage(f"Открыт vault root: {self._config.vault_path}", 4000)
 
     def _apply_global_styles(self) -> None:
