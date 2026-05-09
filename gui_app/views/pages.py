@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui_app.services.script_runner import ScriptRunner
-from gui_app.services.health_service import HealthData, HealthService
+from gui_app.services.health_service import HealthData, HealthIssue, HealthService
 from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, PipelineStepStatus, ScenarioPlan, ScenarioStep, TraceRunResult
 from gui_app.services.state_inspector import StateInspector
 from gui_app.services.trace_service import TraceService
@@ -57,6 +57,7 @@ class DashboardPage(QWidget):
         self._status_line = QLabel("")
         self._recommendation = QLabel("")
         self._diagnostics = QLabel("")
+        self._health_summary = QLabel("Health: —")
 
         self._stat_labels: dict[str, QLabel] = {}
         self._time_labels: dict[str, QLabel] = {}
@@ -90,6 +91,7 @@ class DashboardPage(QWidget):
         cards_layout.addWidget(self._make_timestamps_card(), 1, 0, 1, 2)
         cards_layout.addWidget(self._make_recommendation_card(), 2, 0, 1, 2)
         cards_layout.addWidget(self._make_diagnostics_card(), 3, 0, 1, 2)
+        cards_layout.addWidget(self._make_health_card(), 4, 0, 1, 2)
 
         layout.addLayout(top_row)
         layout.addWidget(self._status_line)
@@ -159,6 +161,11 @@ class DashboardPage(QWidget):
         self._diagnostics.setStyleSheet("color: #8A4B00;")
         body.addWidget(self._diagnostics)
         return card
+    def _make_health_card(self) -> QWidget:
+        card, body = self._make_card("Health summary")
+        self._health_summary.setWordWrap(True)
+        body.addWidget(self._health_summary)
+        return card
 
     def _labeled_value(self, label: str, bucket: dict[str, QLabel], key: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -203,6 +210,8 @@ class DashboardPage(QWidget):
             self._diagnostics.setText("\n".join(f"• {item}" for item in state.diagnostics))
         else:
             self._diagnostics.setText("Проблемы пути/файлов не обнаружены.")
+        health = HealthService(self._inspector.repo_root, self._inspector.repo_root).build_health_report()
+        self._health_summary.setText(f"Всего проблем: {len(health.issues)} | Категорий: {len(health.categories)}")
 
 
 def _fmt_dt(value: datetime | None) -> str:
@@ -710,7 +719,13 @@ class HealthPage(QWidget):
         self._status = QLabel("")
         self._report_path_label = QLabel("—")
         self._categories = QTableWidget(0, 2)
+        self._issues = QTableWidget(0, 4)
         self._viewer = QPlainTextEdit()
+        self._open_file_btn = QPushButton("Открыть файл")
+        self._open_source_btn = QPushButton("Открыть источник")
+        self._run_rebuild_btn = QPushButton("Запустить rebuild")
+        self._goto_trace_btn = QPushButton("Перейти к trace")
+        self._issues_cache: list[HealthIssue] = []
 
         self._build_ui()
         self._load_latest()
@@ -748,6 +763,10 @@ class HealthPage(QWidget):
         self._run_btn.clicked.connect(self._run_lint)
         self._refresh_btn.clicked.connect(self._load_latest)
         self._open_btn.clicked.connect(self._open_report)
+        self._open_file_btn.clicked.connect(self._open_selected_issue_file)
+        self._open_source_btn.clicked.connect(self._open_selected_issue_source)
+        self._run_rebuild_btn.clicked.connect(self._run_safe_rebuild)
+        self._goto_trace_btn.clicked.connect(self._goto_trace)
 
         layout.addWidget(title)
         layout.addWidget(hint)
@@ -756,6 +775,19 @@ class HealthPage(QWidget):
         layout.addLayout(report_row)
         layout.addWidget(QLabel("Категории проблем"))
         layout.addWidget(self._categories, 1)
+        self._issues.setHorizontalHeaderLabels(["Severity", "Категория", "Файл", "Детали"])
+        self._issues.horizontalHeader().setSectionResizeMode(3, self._issues.horizontalHeader().ResizeMode.Stretch)
+        self._issues.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._issues.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        layout.addWidget(QLabel("Проблемы"))
+        layout.addWidget(self._issues, 2)
+        actions = QHBoxLayout()
+        actions.addWidget(self._open_file_btn)
+        actions.addWidget(self._open_source_btn)
+        actions.addWidget(self._run_rebuild_btn)
+        actions.addWidget(self._goto_trace_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
         layout.addWidget(QLabel("Текст отчёта"))
         layout.addWidget(self._viewer, 2)
 
@@ -772,11 +804,16 @@ class HealthPage(QWidget):
             self._viewer.setPlainText((result.stdout + "\n" + result.stderr).strip())
             self._fill_health(health)
             return
-        self._status.setText("Health check завершён успешно.")
+        report = self._service.build_health_report()
+        report_path = self._service.save_report_markdown(report)
+        self._status.setText(f"Health check завершён успешно. Агрегированный отчёт: {report_path.name}")
         self._fill_health(health)
+        self._fill_issues(report.issues)
 
     def _load_latest(self) -> None:
         self._fill_health(self._service.load_latest_report())
+        report = self._service.build_health_report()
+        self._fill_issues(report.issues)
         if self._last_report_path:
             self._status.setText("Загружен последний health report.")
         else:
@@ -801,6 +838,41 @@ class HealthPage(QWidget):
     def _open_report(self) -> None:
         if self._last_report_path and self._last_report_path.exists():
             ObsidianService(self._service.repo_root).open_file(self._last_report_path)
+
+    def _fill_issues(self, issues: tuple[HealthIssue, ...]) -> None:
+        self._issues_cache = list(issues)
+        self._issues.setRowCount(0)
+        for idx, issue in enumerate(issues):
+            self._issues.insertRow(idx)
+            self._issues.setItem(idx, 0, QTableWidgetItem(issue.severity))
+            self._issues.setItem(idx, 1, QTableWidgetItem(issue.category))
+            self._issues.setItem(idx, 2, QTableWidgetItem(issue.path.name))
+            self._issues.setItem(idx, 3, QTableWidgetItem(issue.details))
+
+    def _selected_issue(self) -> HealthIssue | None:
+        row = self._issues.currentRow()
+        if row < 0 or row >= len(self._issues_cache):
+            return None
+        return self._issues_cache[row]
+
+    def _open_selected_issue_file(self) -> None:
+        issue = self._selected_issue()
+        if issue:
+            ObsidianService(self._service.repo_root).open_file(issue.path)
+
+    def _open_selected_issue_source(self) -> None:
+        issue = self._selected_issue()
+        if issue:
+            ObsidianService(self._service.repo_root).open_parent_folder(issue.path)
+
+    def _run_safe_rebuild(self) -> None:
+        self._service._runner.run_script("generate_index.py", ("primary",))
+        self._status.setText("Запущен safe rebuild action: generate_index.py primary.")
+
+    def _goto_trace(self) -> None:
+        issue = self._selected_issue()
+        if issue and "trace" in issue.category:
+            ObsidianService(self._service.repo_root).open_parent_folder(self._service.repo_root / "14_llm_traces")
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[PipelineStepStatus]:
