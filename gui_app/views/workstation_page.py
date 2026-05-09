@@ -48,6 +48,7 @@ class WorkstationPage(QWidget):
         self._details = QPlainTextEdit()
         self._details.setReadOnly(True)
         self._workflow_select = QComboBox()
+        self._current_session_id: str | None = None
         self._build_ui()
         self.refresh()
 
@@ -97,7 +98,11 @@ class WorkstationPage(QWidget):
     def refresh(self) -> None:
         self._sessions.clear()
         for s in self._memory.all_sessions().values():
-            self._sessions.addItem(f"{s['session_id']} | {s['workflow_id']} | step={s['step_index']} | {s['status']} | {s['updated_at']}")
+            row = QListWidgetItem(f"{s['session_id']} | {s['workflow_id']} | step={s['step_index']} | {s['status']} | {s['updated_at']}")
+            row.setData(32, s["session_id"])
+            self._sessions.addItem(row)
+            if s["session_id"] == self._current_session_id:
+                self._sessions.setCurrentItem(row)
         self._fill_actions()
         self._fill_commands()
 
@@ -124,25 +129,36 @@ class WorkstationPage(QWidget):
         wf = self._workflows[self._workflow_select.currentIndex()]
         session = WorkflowSession(session_id=str(uuid.uuid4()), workflow_id=wf.workflow_id, step_index=0)
         self._memory.save_session(session)
+        self._current_session_id = session.session_id
         self._details.setPlainText(f"{wf.title}\nGoal: {wf.goal}\nWhy: {wf.why}\nCurrent step: {wf.steps[0]}")
         self.refresh()
 
     def _next_step(self) -> None:
         selected = self._sessions.currentItem()
-        if not selected:
+        sid = selected.data(32) if selected else self._current_session_id
+        if not sid:
+            self._details.setPlainText("Сначала запустите или выберите workflow session.")
             return
-        sid = selected.text().split(" | ")[0]
         sessions = self._memory.all_sessions()
         payload = sessions.get(sid)
         if payload:
+            wf = next((w for w in self._workflows if w.workflow_id == payload["workflow_id"]), None)
+            next_step_index = payload["step_index"] + 1
+            done = wf is not None and next_step_index >= len(wf.steps)
             session = WorkflowSession(
                 session_id=payload["session_id"],
                 workflow_id=payload["workflow_id"],
-                step_index=payload["step_index"] + 1,
-                status="done" if payload["step_index"] + 1 > 2 else "in_progress",
+                step_index=next_step_index,
+                status="done" if done else "in_progress",
                 notes=payload.get("notes", []),
             )
             self._memory.save_session(session)
+            self._current_session_id = session.session_id
+            if wf is not None:
+                step_label = "Завершено" if done else wf.steps[next_step_index]
+                self._details.setPlainText(
+                    f"{wf.title}\nStep: {session.step_index}/{len(wf.steps)}\nStatus: {session.status}\nCurrent: {step_label}"
+                )
         self.refresh()
 
     def _focus_command(self, item: QListWidgetItem) -> None:
