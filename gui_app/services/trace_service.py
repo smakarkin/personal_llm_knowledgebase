@@ -7,11 +7,22 @@ import subprocess
 from datetime import datetime
 from typing import Callable
 
-import yaml
 
 from gui_app.config import LLM_TRACES_DIR
 from gui_app.models.status_models import TraceRunResult
 from gui_app.services.script_runner import ScriptRunner
+from gui_app.services.frontmatter_utils import dump_frontmatter, parse_frontmatter_block
+
+
+@dataclass(frozen=True)
+class TraceReportMeta:
+    path: Path
+    title: str
+    status: str
+    candidate_for_concept: bool
+    promoted_to_concept: bool
+    source_items_count: int
+    trace_created_at: str
 
 
 @dataclass(frozen=True)
@@ -69,7 +80,7 @@ class TraceService:
         if text.startswith("---\n"):
             parts = text.split("---\n", 2)
             if len(parts) >= 3:
-                meta = yaml.safe_load(parts[1]) or {}
+                meta = parse_frontmatter_block(parts[1]) or {}
                 body = parts[2]
         links = re.findall(r"\[\[(.+?)\]\]", body)
         return {"meta": meta, "body": body, "links": links, "path": path}
@@ -111,7 +122,7 @@ class TraceService:
         if note.strip():
             appendix += f"\n\n## Curator notes\n{note.strip()}\n"
         target = source_path.with_name(source_path.stem + " - curated.md")
-        target.write_text("---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n" + body + appendix, encoding="utf-8")
+        target.write_text("---\n" + dump_frontmatter(meta) + "---\n" + body + appendix, encoding="utf-8")
         return target
 
     def run_trace(self, query: str, on_output: Callable[[str], None] | None = None) -> TraceRunResult:

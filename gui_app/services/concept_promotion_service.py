@@ -4,7 +4,6 @@ from datetime import datetime
 from pathlib import Path
 import re
 
-import yaml
 
 
 class ConceptPromotionService:
@@ -33,5 +32,5 @@ class ConceptPromotionService:
             "\n## Черновой синтез",
             "Заполните вручную на основе supporting notes из trace.",
         ]
-        concept_path.write_text("---\n" + yaml.safe_dump(frontmatter, allow_unicode=True, sort_keys=False) + "---\n" + "\n".join(body), encoding="utf-8")
+        concept_path.write_text("---\n" + dump_frontmatter(frontmatter) + "---\n" + "\n".join(body), encoding="utf-8")
         return concept_path
