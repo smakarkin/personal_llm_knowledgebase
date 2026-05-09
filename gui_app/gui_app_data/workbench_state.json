@@ -1,5 +1,5 @@
 {
-  "last_page": "Dashboard",
+  "last_page": "Workstation V4",
   "recent_trace_queries": [],
   "recent_rebuild_scenarios": [],
   "pinned_files": [],
@@ -7,5 +7,16 @@
   "pinned_indexes": [],
   "pinned_actions": [],
   "recent_artifacts": [],
-  "recent_runs": []
+  "recent_runs": [],
+  "dismissed_recommendations": [],
+  "deferred_review_items": [],
+  "pinned_queues": [],
+  "recent_scenarios": [],
+  "work_mode_preferences": {},
+  "ui_sections_expanded": {},
+  "last_viewed_artifact_per_section": {},
+  "review_item_status": {},
+  "workflow_sessions": {},
+  "dismissed_queues": [],
+  "review_decisions": {}
 }
