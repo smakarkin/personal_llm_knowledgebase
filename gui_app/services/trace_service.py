@@ -25,6 +25,17 @@ class TraceReportMeta:
     trace_created_at: str
 
 
+@dataclass(frozen=True)
+class TraceReportMeta:
+    path: Path
+    title: str
+    status: str
+    candidate_for_concept: bool
+    promoted_to_concept: bool
+    source_items_count: int
+    trace_created_at: str
+
+
 class TraceService:
     """Сервис semantic trace: запуск, чтение отчётов, explainability-данные."""
 
