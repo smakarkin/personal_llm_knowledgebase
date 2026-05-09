@@ -7,8 +7,6 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -33,6 +31,7 @@ from gui_app.models.status_models import InboxNoteStatus, KnowledgeBaseState, Pi
 from gui_app.services.state_inspector import StateInspector
 from gui_app.services.trace_service import TraceService
 from gui_app.services.scenario_planner import ScenarioPlanner
+from gui_app.services.obsidian_service import ObsidianService
 
 PAGE_TITLES = [
     "Dashboard",
@@ -316,7 +315,7 @@ class _ScenarioWorker(QThread):
 class RebuildPage(QWidget):
     """Экран оркестрации rebuild-сценариев поверх существующих скриптов."""
 
-    def __init__(self, repo_root: Path, scripts_path: Path, inbox_folder: str = "InBox") -> None:
+    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
@@ -325,6 +324,7 @@ class RebuildPage(QWidget):
         self._scenarios = [self._planner.build_minimal_plan(state), self._planner.build_safe_plan(state), self._planner.build_full_plan(state)]
         self._scenario_by_key = {item.key: item for item in self._scenarios}
         self._worker: _ScenarioWorker | None = None
+        self._obsidian = obsidian_service
 
         self._scenario_combo = QComboBox()
         self._description = QLabel("")
@@ -429,13 +429,14 @@ class RebuildPage(QWidget):
 class InBoxPage(QWidget):
     """Экран мониторинга InBox без автоматического переноса заметок."""
 
-    def __init__(self, repo_root: Path, scripts_path: Path, inbox_folder: str = "InBox") -> None:
+    def __init__(self, repo_root: Path, scripts_path: Path, obsidian_service: ObsidianService, inbox_folder: str = "InBox") -> None:
         super().__init__()
         self._repo_root = repo_root
         self._inbox_folder = inbox_folder
         self._inspector = StateInspector(repo_root, inbox_folder=inbox_folder)
         self._runner = ScriptRunner(repo_root=repo_root, scripts_path=scripts_path)
         self._worker: _ScenarioWorker | None = None
+        self._obsidian = obsidian_service
 
         self._stats = QLabel("")
         self._status_line = QLabel("")
@@ -443,6 +444,11 @@ class InBoxPage(QWidget):
         self._classify_btn = QPushButton("Запустить классификацию InBox")
         self._open_folder_btn = QPushButton("Открыть папку InBox")
         self._refresh_btn = QPushButton("Обновить")
+        self._open_note_btn = QPushButton("Открыть файл")
+        self._open_parent_btn = QPushButton("Открыть родительскую папку")
+        self._add_handoff_btn = QPushButton("Добавить в handoff")
+        self._handoff_btn = QPushButton("Сформировать handoff report")
+        self._handoff_list = QListWidget()
         self._hint = QLabel(
             "Важно: перенос заметок в Zettelkasten выполняется вручную в Obsidian. "
             "GUI только показывает состояние и готовность к переносу."
@@ -463,6 +469,10 @@ class InBoxPage(QWidget):
         controls = QHBoxLayout()
         controls.addWidget(self._classify_btn)
         controls.addWidget(self._open_folder_btn)
+        controls.addWidget(self._open_note_btn)
+        controls.addWidget(self._open_parent_btn)
+        controls.addWidget(self._add_handoff_btn)
+        controls.addWidget(self._handoff_btn)
         controls.addStretch(1)
         controls.addWidget(self._refresh_btn)
 
@@ -478,6 +488,10 @@ class InBoxPage(QWidget):
         self._classify_btn.clicked.connect(self._run_classification)
         self._open_folder_btn.clicked.connect(self._open_inbox_folder)
         self._refresh_btn.clicked.connect(self.refresh)
+        self._open_note_btn.clicked.connect(self._open_selected_note)
+        self._open_parent_btn.clicked.connect(self._open_selected_parent)
+        self._add_handoff_btn.clicked.connect(self._add_selected_to_handoff)
+        self._handoff_btn.clicked.connect(self._generate_handoff_report)
 
         layout.addWidget(title)
         layout.addWidget(self._hint)
@@ -485,6 +499,8 @@ class InBoxPage(QWidget):
         layout.addWidget(self._stats)
         layout.addWidget(self._status_line)
         layout.addWidget(self._table, 1)
+        layout.addWidget(QLabel("Очередь handoff (ручной перенос в Obsidian)"))
+        layout.addWidget(self._handoff_list)
 
     def refresh(self) -> None:
         notes = self._inspector.inspect_inbox_notes()
@@ -497,6 +513,7 @@ class InBoxPage(QWidget):
             f"Критерий готовности: не пустая, без llm_skip_reason, есть осмысленная llm-разметка."
         )
         self._fill_table(notes)
+        self._refresh_handoff_list()
 
     def _fill_table(self, notes: list[InboxNoteStatus]) -> None:
         self._table.setRowCount(len(notes))
@@ -535,8 +552,43 @@ class InBoxPage(QWidget):
         self.refresh()
 
     def _open_inbox_folder(self) -> None:
-        inbox_path, _ = self._inspector.repo_root / self._inbox_folder, None
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(inbox_path)))
+        inbox_path = self._inspector.repo_root / self._inbox_folder
+        self._obsidian.open_folder(inbox_path)
+
+    def _selected_note(self) -> InboxNoteStatus | None:
+        row = self._table.currentRow()
+        if row < 0:
+            return None
+        notes = self._inspector.inspect_inbox_notes()
+        return notes[row] if row < len(notes) else None
+
+    def _open_selected_note(self) -> None:
+        note = self._selected_note()
+        if note:
+            self._obsidian.open_file(note.path)
+
+    def _open_selected_parent(self) -> None:
+        note = self._selected_note()
+        if note:
+            self._obsidian.open_parent_folder(note.path)
+
+    def _add_selected_to_handoff(self) -> None:
+        note = self._selected_note()
+        if note is None:
+            return
+        status = "ready" if note.is_ready_for_transfer else "needs_attention"
+        self._obsidian.add_to_handoff(note.file_name, note.path, status)
+        self._refresh_handoff_list()
+
+    def _generate_handoff_report(self) -> None:
+        report = self._obsidian.write_handoff_report(self._repo_root / "14_llm_traces")
+        self._status_line.setText(f"Сформирован handoff report: {report}")
+        self._obsidian.open_file(report)
+
+    def _refresh_handoff_list(self) -> None:
+        self._handoff_list.clear()
+        for item in self._obsidian.handoff_queue:
+            QListWidgetItem(f"{item.title} [{item.status}]", self._handoff_list)
 
 
 
@@ -678,7 +730,7 @@ class TracePage(QWidget):
 
     def _open_report(self) -> None:
         if self._last_report_path and self._last_report_path.exists():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_report_path)))
+            ObsidianService(self._service.repo_root).open_file(self._last_report_path)
 
 
 class HealthPage(QWidget):
@@ -785,7 +837,7 @@ class HealthPage(QWidget):
 
     def _open_report(self) -> None:
         if self._last_report_path and self._last_report_path.exists():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_report_path)))
+            ObsidianService(self._service.repo_root).open_file(self._last_report_path)
 
 
 def _build_pipeline_steps(state: KnowledgeBaseState) -> list[PipelineStepStatus]:
