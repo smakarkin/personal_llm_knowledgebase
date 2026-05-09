@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Iterable
 
-from gui_app.models.status_models import RebuildScenario, RebuildStep
+from gui_app.models.status_models import ScenarioPlan, ScenarioStep
 
 
 @dataclass
@@ -58,9 +58,9 @@ class ScriptRunner:
 
     def run_scenario(
         self,
-        scenario: RebuildScenario,
+        scenario: ScenarioPlan,
         *,
-        on_step_start: Callable[[int, int, RebuildStep], None] | None = None,
+        on_step_start: Callable[[int, int, ScenarioStep], None] | None = None,
         on_output: Callable[[str], None] | None = None,
     ) -> list[ScriptResult]:
         """Последовательно выполняет шаги сценария."""
@@ -111,55 +111,3 @@ class ScriptRunner:
         return ScriptResult(return_code=return_code, stdout=output, stderr="")
 
 
-from gui_app.config import DEFAULT_INBOX_FOLDER, DEFAULT_ZETTELKASTEN_FOLDER
-
-def build_rebuild_scenarios(inbox_folder: str = DEFAULT_INBOX_FOLDER, zettelkasten_folder: str = DEFAULT_ZETTELKASTEN_FOLDER) -> list[RebuildScenario]:
-    """Возвращает централизованное описание сценариев для экрана Rebuild."""
-    return [
-        RebuildScenario(
-            key="classify_inbox",
-            title="Дозаполнить классификацию InBox",
-            description=f"Запустить propose_clusters.py для папки {inbox_folder}.",
-            steps=(RebuildStep("Классификация InBox", "propose_clusters.py", (inbox_folder,)),),
-        ),
-        RebuildScenario(
-            key="classify_zettelkasten",
-            title="Дозаполнить классификацию Zettelkasten",
-            description=f"Запустить propose_clusters.py для папки {zettelkasten_folder}.",
-            steps=(RebuildStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),),
-        ),
-        RebuildScenario(
-            key="rebuild_primary",
-            title="Пересобрать primary layer",
-            description="Collections -> Concepts -> Index для режима primary.",
-            steps=(
-                RebuildStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
-                RebuildStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
-                RebuildStep("Генерация primary index", "generate_index.py", ("primary",)),
-            ),
-        ),
-        RebuildScenario(
-            key="rebuild_candidate",
-            title="Пересобрать candidate layer",
-            description="Collections -> Concepts -> Index для режима candidate.",
-            steps=(
-                RebuildStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
-                RebuildStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
-                RebuildStep("Генерация candidate index", "generate_index.py", ("candidate",)),
-            ),
-        ),
-        RebuildScenario(
-            key="rebuild_full",
-            title="Полная пересборка knowledge layer",
-            description="Классификация папки, затем полные primary и candidate этапы.",
-            steps=(
-                RebuildStep("Классификация Zettelkasten", "propose_clusters.py", (zettelkasten_folder,)),
-                RebuildStep("Сборка primary collections", "build_collection.py", (zettelkasten_folder, "primary")),
-                RebuildStep("Генерация primary concepts", "generate_concepts.py", ("primary",)),
-                RebuildStep("Генерация primary index", "generate_index.py", ("primary",)),
-                RebuildStep("Сборка candidate collections", "build_collection.py", (zettelkasten_folder, "candidate")),
-                RebuildStep("Генерация candidate concepts", "generate_concepts.py", ("candidate",)),
-                RebuildStep("Генерация candidate index", "generate_index.py", ("candidate",)),
-            ),
-        ),
-    ]
