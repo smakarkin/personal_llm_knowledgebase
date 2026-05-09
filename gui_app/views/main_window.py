@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from gui_app.config import AppConfig, save_app_config
 from gui_app.services.workbench_state import WorkbenchStateStore
-from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, SettingsPage, TracePage, create_placeholder_page
+from gui_app.views.pages import PAGE_TITLES, DashboardPage, HealthPage, InBoxPage, PipelineMapPage, RebuildPage, SearchPage, SettingsPage, TracePage, create_placeholder_page
 from gui_app.views.review_page import ReviewPage
 from gui_app.services.obsidian_service import ObsidianService
 
@@ -130,6 +130,8 @@ class MainWindow(QMainWindow):
                         scripts_path=self._config.scripts_path,
                     )
                 )
+            elif page_title == "Search":
+                self._stack.addWidget(SearchPage(repo_root=self._config.vault_path))
             elif page_title == "Sources":
                 self._stack.addWidget(ReviewPage(repo_root=self._config.vault_path))
             elif page_title == "Health":
