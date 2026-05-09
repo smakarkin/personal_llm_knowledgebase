@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
                     RebuildPage(
                         repo_root=self._config.vault_path,
                         scripts_path=self._config.scripts_path,
+                        obsidian_service=self._obsidian,
                         inbox_folder=self._config.inbox_folder,
                     )
                 )
