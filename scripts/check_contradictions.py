@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import re
 import sys
+import time
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +47,20 @@ def safe_print(*args: Any) -> None:
         sys.stdout.flush()
     except Exception:
         print(text)
+
+
+def log_llm_telemetry(step: str, started_at: float, payload: str, response_text: str, parse_ok: bool) -> None:
+    finished_at = time.time()
+    safe_print(
+        "LLM_TELEMETRY",
+        f"step={step}",
+        f"started_utc={dt.datetime.fromtimestamp(started_at, tz=dt.timezone.utc).isoformat()}",
+        f"finished_utc={dt.datetime.fromtimestamp(finished_at, tz=dt.timezone.utc).isoformat()}",
+        f"duration_sec={finished_at - started_at:.3f}",
+        f"payload_chars={len(payload or '')}",
+        f"response_chars={len(response_text or '')}",
+        f"parse_status={'success' if parse_ok else 'fail'}",
+    )
 
 
 def parse_note(path: Path) -> tuple[dict, str]:
@@ -309,6 +324,7 @@ Cluster: {b.cluster}
 """
 
     try:
+        started_at = time.time()
         resp = client.chat.completions.create(
             model=MODEL,
             temperature=0.1,
@@ -320,6 +336,7 @@ Cluster: {b.cluster}
         text = (resp.choices[0].message.content or "").strip()
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         data = json.loads(text)
+        log_llm_telemetry("llm_assessment", started_at, prompt, text, True)
         if not isinstance(data, dict):
             raise ValueError("LLM вернул не JSON-объект")
         return {
@@ -330,6 +347,7 @@ Cluster: {b.cluster}
             "confidence": float(data.get("confidence", 0.0)),
         }
     except Exception as e:
+        log_llm_telemetry("llm_assessment", started_at, prompt, (locals().get("text", "") or ""), False)
         fallback = heuristic_assessment(a, b)
         fallback["explanation"] = f"{fallback['explanation']} (LLM fallback: {e})"
         return fallback
