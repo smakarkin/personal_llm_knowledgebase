@@ -28,6 +28,7 @@ TOP_K_STAGE2 = 20
 MAX_STAGE1_PAYLOAD_CHARS = 1800
 MAX_STAGE2_PAYLOAD_CHARS = 2000
 MAX_JSON_FIX_ATTEMPTS = 2
+JSON_SYSTEM_PROMPT = "Верни только валидный JSON. Язык вывода: русский."
 
 
 def safe_print(*args):
@@ -226,7 +227,7 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
 Выбирай только действительно релевантные материалы.
 Старайся отдать не больше {TOP_K_STAGE1}.
 Материалы:
-{json.dumps(payload, ensure_ascii=False, indent=2)}
+{json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}
 """
 
     data: dict[str, Any] | None = None
@@ -238,7 +239,7 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
                 model=MODEL,
                 temperature=0,
                 messages=[
-                    {"role": "system", "content": "Ты делаешь точный семантический отбор и возвращаешь только валидный JSON."},
+                    {"role": "system", "content": JSON_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
             )
@@ -355,7 +356,7 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
 
 Выбирай не больше {TOP_K_STAGE2} заметок.
 Материалы:
-{json.dumps(payload, ensure_ascii=False, indent=2)}
+{json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}
 """
 
     data: dict[str, Any] | None = None
@@ -367,7 +368,7 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
                 model=MODEL,
                 temperature=0,
                 messages=[
-                    {"role": "system", "content": "Ты восстанавливаешь смысловые основания идеи и возвращаешь только валидный JSON."},
+                    {"role": "system", "content": JSON_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
             )

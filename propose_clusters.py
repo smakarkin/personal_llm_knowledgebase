@@ -15,6 +15,7 @@ OUTPUT_DIR = VAULT / "10_llm_meta"
 MAX_NOTES_FOR_SCHEME = 40
 BATCH_SIZE = 20
 MAX_BODY_CHARS = 700
+JSON_SYSTEM_PROMPT = "Верни только валидный JSON. Язык вывода: русский."
 
 
 def safe_print(*args):
@@ -99,10 +100,23 @@ def should_skip_path(path: Path) -> bool:
 
 
 def load_notes_from_folder(folder_arg: str) -> tuple[Path, list[Path]]:
-    folder_path = VAULT / folder_arg
+    raw_arg = Path(folder_arg)
+    candidates = []
+    if raw_arg.is_absolute():
+        candidates.append(raw_arg)
+    else:
+        candidates.extend([
+            VAULT / raw_arg,
+            VAULT.parent / raw_arg,
+            Path.cwd() / raw_arg,
+            Path.cwd().parent / raw_arg,
+        ])
 
-    if not folder_path.exists():
-        raise FileNotFoundError(f"Folder not found: {folder_path}")
+    folder_path = next((p for p in candidates if p.exists()), None)
+    if folder_path is None:
+        raise FileNotFoundError(
+            "Folder not found. Checked: " + " | ".join(str(p) for p in candidates)
+        )
 
     if not folder_path.is_dir():
         raise NotADirectoryError(f"Not a directory: {folder_path}")
@@ -144,7 +158,7 @@ def save_scheme(folder_arg: str, scheme: dict):
         "scope_folder": folder_arg,
     }
 
-    body = "# Схема кластеров\n\n```json\n" + json.dumps(scheme, ensure_ascii=False, indent=2) + "\n```\n"
+    body = "# Схема кластеров\n\n```json\n" + json.dumps(scheme, ensure_ascii=False, separators=(",", ":")) + "\n```\n"
     text = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n\n" + body
     out_path.write_text(text, encoding="utf-8")
     safe_print("SAVED SCHEME:", out_path.name)
@@ -183,48 +197,12 @@ def propose_cluster_scheme(scope_name: str, note_paths: list[Path]) -> dict:
             "text": body,
         })
 
-    prompt = f"""
-You are designing a reusable cluster scheme for Obsidian notes inside one selected folder.
-
-Write all output in Russian.
-Cluster ids must also be in Russian.
-Do not use English unless there is no good Russian equivalent.
-
-Task:
-1. Read the notes.
-2. Propose 8 to 12 broad, reusable clusters for this set of notes.
-3. Clusters must be high-level enough that multiple notes can fit into each.
-4. Avoid note-specific labels.
-5. Return strict JSON.
-
-Important rules for cluster ids:
-- use short Russian labels
-- 1 to 4 words
-- lowercase
-- no transliteration
-- no English
-- no note-specific wording
-- clusters must be reusable across many notes
-
-Required JSON format:
-{{
-  "scope_topic": "...",
-  "clusters": [
-    {{
-      "id": "русское название кластера",
-      "name": "человеко-читаемое русское название",
-      "description": "какие заметки сюда относятся",
-      "inclusion_rules": ["...", "..."],
-      "exclusion_rules": ["...", "..."]
-    }}
-  ]
-}}
-
+    prompt = f"""Задача: предложить переиспользуемую схему кластеров для папки заметок.
+Требования: 8-12 широких кластеров; id кластера на русском, lowercase, 1-4 слова; без английского/транслита и без note-specific формулировок.
+Верни JSON формата: {{"scope_topic":"...","clusters":[{{"id":"...","name":"...","description":"...","inclusion_rules":["..."],"exclusion_rules":["..."]}}]}}.
 Scope: {scope_name}
-
 Notes:
-{json.dumps(notes_payload, ensure_ascii=False, indent=2)}
-"""
+{json.dumps(notes_payload, ensure_ascii=False, separators=(",",":"))}"""
 
     started_at = time.time()
     resp = client.chat.completions.create(
@@ -233,7 +211,7 @@ Notes:
         messages=[
             {
                 "role": "system",
-                "content": "You design note clustering schemes and return only valid JSON in Russian."
+                "content": JSON_SYSTEM_PROMPT
             },
             {
                 "role": "user",
@@ -254,40 +232,16 @@ Notes:
 
 
 def classify_note(title: str, body: str, folder_arg: str, scheme: dict) -> dict:
-    prompt = f"""
-You classify a short Obsidian note using a predefined cluster scheme.
-
-Write all output fields in Russian.
-Use English only if there is no good natural Russian equivalent.
-
-Return strict JSON with keys:
-topic, semantic_type, primary_cluster, candidate_clusters.
-
-semantic_type must be one of:
-hypothesis, question, observation, claim, example, reference.
-
-Rules:
-- primary_cluster must be one of the provided cluster ids exactly
-- candidate_clusters must be a list of 3 to 5 cluster ids
-- every item in candidate_clusters must be one of the provided cluster ids exactly
-- do not invent new cluster ids
-- candidate_clusters must be ordered from most relevant to less relevant
-- primary_cluster must be the first or strongest candidate
-- topic must be in Russian
-- do not summarize
-- do not rewrite the note
-- keep topic short
-
+    prompt = f"""Классифицируй заметку по готовой cluster scheme.
+Верни JSON с ключами: topic, semantic_type, primary_cluster, candidate_clusters.
+semantic_type ∈ [hypothesis,question,observation,claim,example,reference].
+Правила: primary/candidate только из id схемы; candidate_clusters = 3-5 id по убыванию релевантности; primary должен быть первым/сильнейшим кандидатом; topic короткий, на русском.
 Folder scope: {folder_arg}
-
 Cluster scheme:
-{json.dumps(scheme, ensure_ascii=False, indent=2)}
-
+{json.dumps(scheme, ensure_ascii=False, separators=(",",":"))}
 Note title: {title}
-
 Note body:
-{truncate_body(body)}
-"""
+{truncate_body(body)}"""
 
     started_at = time.time()
     resp = client.chat.completions.create(
@@ -296,7 +250,7 @@ Note body:
         messages=[
             {
                 "role": "system",
-                "content": "You classify notes using a fixed cluster scheme and return only valid JSON."
+                "content": JSON_SYSTEM_PROMPT
             },
             {
                 "role": "user",
