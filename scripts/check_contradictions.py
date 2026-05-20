@@ -329,7 +329,7 @@ Cluster: {b.cluster}
             model=MODEL,
             temperature=0.1,
             messages=[
-                {"role": "system", "content": "Ты аккуратный аналитик противоречий в knowledge base."},
+                {"role": "system", "content": "Верни только валидный JSON. Язык вывода: русский."},
                 {"role": "user", "content": prompt},
             ],
         )

@@ -14,6 +14,7 @@ COLLECTIONS_PRIMARY_DIR = VAULT / "11_llm_collections_primary"
 COLLECTIONS_CANDIDATE_DIR = VAULT / "11_llm_collections_candidate"
 CONCEPTS_DIR = VAULT / "12_llm_concepts"
 INDEXES_DIR = VAULT / "13_llm_indexes"
+MARKDOWN_SYSTEM_PROMPT = "Верни только markdown. Язык вывода: русский; wikilinks не изменяй."
 
 OVERWRITE_EXISTING = True
 DEFAULT_MODE = "primary"
@@ -219,7 +220,7 @@ Output structure:
         messages=[
             {
                 "role": "system",
-                "content": "You build overview indexes for Obsidian knowledge bases. You must preserve provided wikilinks exactly."
+                "content": MARKDOWN_SYSTEM_PROMPT
             },
             {
                 "role": "user",
