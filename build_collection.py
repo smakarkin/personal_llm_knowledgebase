@@ -13,6 +13,7 @@ client = get_client()
 
 OUTPUT_DIR_PRIMARY = VAULT / "11_llm_collections_primary"
 OUTPUT_DIR_CANDIDATE = VAULT / "11_llm_collections_candidate"
+MARKDOWN_SYSTEM_PROMPT = "Верни только markdown. Язык вывода: русский."
 
 OVERWRITE_EXISTING = True
 MIN_NOTES_IN_CLUSTER = 2
@@ -236,7 +237,7 @@ Output structure:
         messages=[
             {
                 "role": "system",
-                "content": "You synthesize Obsidian note clusters into markdown collections."
+                "content": MARKDOWN_SYSTEM_PROMPT
             },
             {
                 "role": "user",
