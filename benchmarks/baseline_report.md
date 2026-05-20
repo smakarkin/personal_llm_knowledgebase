@@ -39,3 +39,13 @@ python scripts/check_contradictions.py --help
 ## Notes
 - This baseline adds only telemetry around LLM calls.
 - No frontmatter conventions, naming conventions, or CLI contracts were changed.
+
+python .\classify_notes.py "InBox"
+python .\propose_clusters.py "InBox"
+python .\build_collection.py "InBox" primary
+python .\build_collection.py "InBox" candidate
+python .\generate_concepts.py primary
+python .\generate_concepts.py candidate
+python .\generate_index.py primary
+python .\generate_index.py candidate
+python .\semantic_trace.py "Как системно изменять организационные процессы и практики, обладая ограниченной формальной властью, но имея возможность влиять на практики в отдельных частях организации (проекты)"
