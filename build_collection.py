@@ -99,6 +99,7 @@ def parse_note(path: Path) -> tuple[dict, str]:
 
 def load_notes_from_folder(folder_arg: str) -> tuple[Path, list[Path]]:
     raw_arg = Path(folder_arg)
+    script_dir = Path(__file__).resolve().parent
     candidates = []
     if raw_arg.is_absolute():
         candidates.append(raw_arg)
@@ -108,9 +109,24 @@ def load_notes_from_folder(folder_arg: str) -> tuple[Path, list[Path]]:
             VAULT.parent / raw_arg,
             Path.cwd() / raw_arg,
             Path.cwd().parent / raw_arg,
+            script_dir / raw_arg,
+            script_dir.parent / raw_arg,
+            script_dir.parent.parent / raw_arg,
         ])
 
-    folder_path = next((p for p in candidates if p.exists()), None)
+    def resolve_case_insensitive(path: Path) -> Path | None:
+        if path.exists():
+            return path
+        parent = path.parent
+        if not parent.exists() or not parent.is_dir():
+            return None
+        target = path.name.casefold()
+        for child in parent.iterdir():
+            if child.name.casefold() == target:
+                return child
+        return None
+
+    folder_path = next((resolved for p in candidates if (resolved := resolve_case_insensitive(p)) is not None), None)
     if folder_path is None:
         raise FileNotFoundError(
             "Folder not found. Checked: " + " | ".join(str(p) for p in candidates)
