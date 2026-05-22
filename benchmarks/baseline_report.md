@@ -40,12 +40,12 @@ python scripts/check_contradictions.py --help
 - This baseline adds only telemetry around LLM calls.
 - No frontmatter conventions, naming conventions, or CLI contracts were changed.
 
-python .\classify_notes.py "__InBox"
-python .\propose_clusters.py "__InBox"
-python .\build_collection.py "__InBox" primary
-python .\build_collection.py "__InBox" candidate
-python .\generate_concepts.py primary
-python .\generate_concepts.py candidate
-python .\generate_index.py primary
-python .\generate_index.py candidate
-python .\semantic_trace.py "Как системно изменять организационные процессы и практики, обладая ограниченной формальной властью, но имея возможность влиять на практики в отдельных частях организации (проекты)"
+python .\classify_notes.py "__InBox" 2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\propose_clusters.py "__InBox"  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\build_collection.py "__InBox" primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\build_collection.py "__InBox" candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_concepts.py primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_concepts.py candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_index.py primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_index.py candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\semantic_trace.py "Как системно изменять организационные процессы и практики, обладая ограниченной формальной властью, но имея возможность влиять на практики в отдельных частях организации (проекты)"  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
