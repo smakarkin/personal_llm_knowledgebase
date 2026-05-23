@@ -40,22 +40,12 @@ python scripts/check_contradictions.py --help
 - This baseline adds only telemetry around LLM calls.
 - No frontmatter conventions, naming conventions, or CLI contracts were changed.
 
-## Automated benchmark runner
-
-Use a single command to run all checks, collect telemetry, and produce verdict:
-
-```bash
-python scripts/run_benchmark.py --config benchmarks/benchmark_config.json --baseline benchmarks/baseline_metrics.json
-```
-
-Output artifacts are written to `benchmarks/runs/<UTC_TIMESTAMP>/`:
-- `raw.log` — full stdout/stderr from executed commands
-- `events.json` — parsed `LLM_TELEMETRY` events
-- `metrics.json` — aggregated metrics for this run
-- `compare.json` — delta vs baseline and verdict (if baseline provided)
-- `summary.md` — human-readable summary table and final verdict
-
-To create baseline metrics file initially:
-1. Run without `--baseline`.
-2. Copy generated `metrics.json` to `benchmarks/baseline_metrics.json`.
-3. Use that baseline file in subsequent runs.
+python .\classify_notes.py "__InBox" 2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\propose_clusters.py "__InBox"  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\build_collection.py "__InBox" primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\build_collection.py "__InBox" candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_concepts.py primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_concepts.py candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_index.py primary  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\generate_index.py candidate  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
+python .\semantic_trace.py "Как системно изменять организационные процессы и практики, обладая ограниченной формальной властью, но имея возможность влиять на практики в отдельных частях организации (проекты)"  2>&1 | Tee-Object -FilePath .\benchmarks\step1_run.log -Append
