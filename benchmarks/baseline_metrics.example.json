@@ -1,0 +1,11 @@
+{
+  "total_duration_sec": 0.0,
+  "commands_count": 0,
+  "commands_failed": 0,
+  "llm_calls_count": 0,
+  "payload_chars_sum": 0,
+  "response_chars_sum": 0,
+  "parse_fail_count": 0,
+  "avg_llm_duration_sec": 0.0,
+  "by_step": {}
+}
