@@ -2,6 +2,8 @@ from pathlib import Path
 import sys
 import re
 import json
+import time
+from datetime import datetime, timezone
 import yaml
 
 from config import MODEL, VAULT_PATH, get_client
@@ -26,6 +28,20 @@ def safe_print(*args):
             print(fallback)
         except Exception:
             print("[UNPRINTABLE OUTPUT]")
+
+
+def log_llm_telemetry(step: str, started_at: float, payload: str, response_text: str, parse_ok: bool):
+    finished_at = time.time()
+    safe_print(
+        "LLM_TELEMETRY",
+        f"step={step}",
+        f"started_utc={datetime.fromtimestamp(started_at, tz=timezone.utc).isoformat()}",
+        f"finished_utc={datetime.fromtimestamp(finished_at, tz=timezone.utc).isoformat()}",
+        f"duration_sec={finished_at - started_at:.3f}",
+        f"payload_chars={len(payload or '')}",
+        f"response_chars={len(response_text or '')}",
+        f"parse_status={'success' if parse_ok else 'fail'}",
+    )
 
 
 def get_folder_arg() -> str:
@@ -210,6 +226,7 @@ Notes:
 {json.dumps(notes_payload, ensure_ascii=False, indent=2)}
 """
 
+    started_at = time.time()
     resp = client.chat.completions.create(
         model=MODEL,
         temperature=0.2,
@@ -225,9 +242,15 @@ Notes:
         ],
     )
 
-    text = resp.choices[0].message.content.strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(text)
+    raw_text = (resp.choices[0].message.content or "").strip()
+    text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    try:
+        parsed = json.loads(text)
+        log_llm_telemetry("propose_cluster_scheme", started_at, prompt, raw_text, True)
+        return parsed
+    except Exception:
+        log_llm_telemetry("propose_cluster_scheme", started_at, prompt, raw_text, False)
+        raise
 
 
 def classify_note(title: str, body: str, folder_arg: str, scheme: dict) -> dict:
@@ -266,6 +289,7 @@ Note body:
 {truncate_body(body)}
 """
 
+    started_at = time.time()
     resp = client.chat.completions.create(
         model=MODEL,
         temperature=0,
@@ -281,9 +305,15 @@ Note body:
         ],
     )
 
-    text = resp.choices[0].message.content.strip()
-    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(text)
+    raw_text = (resp.choices[0].message.content or "").strip()
+    text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    try:
+        parsed = json.loads(text)
+        log_llm_telemetry("classify_note", started_at, prompt, raw_text, True)
+        return parsed
+    except Exception:
+        log_llm_telemetry("classify_note", started_at, prompt, raw_text, False)
+        raise
 
 
 def is_processed(meta: dict) -> bool:

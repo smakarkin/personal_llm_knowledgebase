@@ -1,0 +1,18 @@
+{
+  "commands": [
+    "python classify_notes.py \"<scope_folder>\"",
+    "python propose_clusters.py \"<scope_folder>\"",
+    "python build_collection.py \"<scope_folder>\" primary",
+    "python build_collection.py \"<scope_folder>\" candidate",
+    "python generate_concepts.py primary",
+    "python generate_concepts.py candidate",
+    "python generate_index.py primary",
+    "python generate_index.py candidate",
+    "python semantic_trace.py \"<query_text>\""
+  ],
+  "thresholds": {
+    "payload_improve_pct": 10.0,
+    "duration_improve_pct": 5.0,
+    "max_parse_fail_delta": 0
+  }
+}

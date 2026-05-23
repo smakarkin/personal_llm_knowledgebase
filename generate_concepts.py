@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 import re
+import time
+from datetime import datetime, timezone
 import yaml
 
 from config import MODEL, VAULT_PATH, get_client
@@ -27,6 +29,20 @@ def safe_print(*args):
             print(fallback)
         except Exception:
             print("[UNPRINTABLE OUTPUT]")
+
+
+def log_llm_telemetry(step: str, started_at: float, payload: str, response_text: str):
+    finished_at = time.time()
+    safe_print(
+        "LLM_TELEMETRY",
+        f"step={step}",
+        f"started_utc={datetime.fromtimestamp(started_at, tz=timezone.utc).isoformat()}",
+        f"finished_utc={datetime.fromtimestamp(finished_at, tz=timezone.utc).isoformat()}",
+        f"duration_sec={finished_at - started_at:.3f}",
+        f"payload_chars={len(payload or '')}",
+        f"response_chars={len(response_text or '')}",
+        "parse_status=success",
+    )
 
 
 def get_mode_arg() -> str:
@@ -169,6 +185,7 @@ Output structure:
 # Основания
 """
 
+    started_at = time.time()
     resp = client.chat.completions.create(
         model=MODEL,
         temperature=0.2,
@@ -184,8 +201,9 @@ Output structure:
         ],
     )
 
-    text = resp.choices[0].message.content.strip()
-    text = text.removeprefix("```markdown").removeprefix("```").removesuffix("```").strip()
+    raw_text = (resp.choices[0].message.content or "").strip()
+    text = raw_text.removeprefix("```markdown").removeprefix("```").removesuffix("```").strip()
+    log_llm_telemetry("build_concept_markdown", started_at, prompt, raw_text)
 
     source_collections = [f"[[{item['path'].stem}]]" for item in collections]
     source_scopes = sorted({item.get("based_on_scope") for item in collections if item.get("based_on_scope")})
