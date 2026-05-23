@@ -6,6 +6,7 @@ import json
 import re
 import sys
 import time
+from datetime import timezone
 from typing import Any
 
 import yaml
@@ -36,6 +37,20 @@ def safe_print(*args):
         sys.stdout.flush()
     except Exception:
         print(text.encode("cp1251", errors="replace").decode("cp1251", errors="replace"))
+
+
+def log_llm_telemetry(step: str, started_at: float, payload: str, response_text: str, parse_ok: bool):
+    finished_at = time.time()
+    safe_print(
+        "LLM_TELEMETRY",
+        f"step={step}",
+        f"started_utc={datetime.fromtimestamp(started_at, tz=timezone.utc).isoformat()}",
+        f"finished_utc={datetime.fromtimestamp(finished_at, tz=timezone.utc).isoformat()}",
+        f"duration_sec={finished_at - started_at:.3f}",
+        f"payload_chars={len(payload or '')}",
+        f"response_chars={len(response_text or '')}",
+        f"parse_status={'success' if parse_ok else 'fail'}",
+    )
 
 
 def progress(step: int, total: int, label: str):
@@ -218,6 +233,7 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
     last_error = None
     for attempt in range(1, MAX_JSON_FIX_ATTEMPTS + 1):
         try:
+            started_at = time.time()
             resp = client.chat.completions.create(
                 model=MODEL,
                 temperature=0,
@@ -228,8 +244,10 @@ def stage1_rank(query: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]
             )
             text = resp.choices[0].message.content or ""
             data = robust_json_loads(text)
+            log_llm_telemetry("stage1_rank", started_at, prompt, text, True)
             break
         except Exception as exc:
+            log_llm_telemetry("stage1_rank", started_at, prompt, (locals().get("text", "") or ""), False)
             last_error = exc
             safe_print(f"STAGE1 PARSE RETRY {attempt}/{MAX_JSON_FIX_ATTEMPTS}:", exc)
             time.sleep(0.5)
@@ -344,6 +362,7 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
     last_error = None
     for attempt in range(1, MAX_JSON_FIX_ATTEMPTS + 1):
         try:
+            started_at = time.time()
             resp = client.chat.completions.create(
                 model=MODEL,
                 temperature=0,
@@ -354,8 +373,10 @@ def stage2_trace_notes(query: str, note_items: list[dict[str, Any]]) -> tuple[li
             )
             text = resp.choices[0].message.content or ""
             data = robust_json_loads(text)
+            log_llm_telemetry("stage2_trace_notes", started_at, prompt, text, True)
             break
         except Exception as exc:
+            log_llm_telemetry("stage2_trace_notes", started_at, prompt, (locals().get("text", "") or ""), False)
             last_error = exc
             safe_print(f"STAGE2 PARSE RETRY {attempt}/{MAX_JSON_FIX_ATTEMPTS}:", exc)
             time.sleep(0.5)
