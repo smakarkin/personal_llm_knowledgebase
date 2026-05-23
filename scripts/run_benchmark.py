@@ -221,6 +221,8 @@ def main() -> int:
     parser.add_argument("--config", required=True, help="Path to benchmark config JSON.")
     parser.add_argument("--baseline", help="Path to baseline metrics JSON.")
     parser.add_argument("--out-dir", default="benchmarks/runs", help="Directory to store benchmark runs.")
+    parser.add_argument("--scope-folder", help="Value to replace <scope_folder> placeholder in commands.")
+    parser.add_argument("--query-text", help="Value to replace <query_text> placeholder in commands.")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -232,10 +234,31 @@ def main() -> int:
     if not isinstance(commands, list) or not commands:
         raise SystemExit("Config must contain non-empty 'commands' list")
 
+    has_scope_placeholder = any("<scope_folder>" in cmd for cmd in commands)
+    has_query_placeholder = any("<query_text>" in cmd for cmd in commands)
+
+    if has_scope_placeholder and not args.scope_folder:
+        raise SystemExit(
+            "Config contains <scope_folder> placeholder. "
+            "Pass --scope-folder \"<folder>\" (for example: --scope-folder \"InBox\")."
+        )
+
+    if has_query_placeholder and not args.query_text:
+        raise SystemExit(
+            "Config contains <query_text> placeholder. "
+            "Pass --query-text \"<search query>\"."
+        )
+
+    prepared_commands = commands[:]
+    if args.scope_folder:
+        prepared_commands = [cmd.replace("<scope_folder>", args.scope_folder) for cmd in prepared_commands]
+    if args.query_text:
+        prepared_commands = [cmd.replace("<query_text>", args.query_text) for cmd in prepared_commands]
+
     run_dir = out_root / utc_now()
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    command_runs, events = run_commands(commands, repo_root, run_dir / "raw.log")
+    command_runs, events = run_commands(prepared_commands, repo_root, run_dir / "raw.log")
     metrics = aggregate_metrics(command_runs, events)
 
     (run_dir / "command_runs.json").write_text(json.dumps(command_runs, ensure_ascii=False, indent=2), encoding="utf-8")
