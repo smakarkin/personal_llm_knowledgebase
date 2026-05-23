@@ -13,6 +13,7 @@ client = get_client()
 COLLECTIONS_PRIMARY_DIR = VAULT / "11_llm_collections_primary"
 COLLECTIONS_CANDIDATE_DIR = VAULT / "11_llm_collections_candidate"
 CONCEPTS_DIR = VAULT / "12_llm_concepts"
+MARKDOWN_SYSTEM_PROMPT = "Верни только markdown. Язык вывода: русский."
 
 OVERWRITE_EXISTING = True
 DEFAULT_MODE = "primary"
@@ -192,7 +193,7 @@ Output structure:
         messages=[
             {
                 "role": "system",
-                "content": "You synthesize concept notes from Obsidian collections."
+                "content": MARKDOWN_SYSTEM_PROMPT
             },
             {
                 "role": "user",
